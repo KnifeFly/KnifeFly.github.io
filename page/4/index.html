@@ -160,6 +160,185 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/03/16/nginx互斥锁的实现/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/03/16/nginx互斥锁的实现/" class="post-title-link" itemprop="url">nginx互斥锁的实现</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2018-03-16 11:15:22" itemprop="dateCreated datePublished" datetime="2018-03-16T11:15:22+08:00">2018-03-16</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2020-08-03 23:13:15" itemprop="dateModified" datetime="2020-08-03T23:13:15+08:00">2020-08-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/nginx/" itemprop="url" rel="index"><span itemprop="name">nginx</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="nginx互斥锁的实现"><a href="#nginx互斥锁的实现" class="headerlink" title="nginx互斥锁的实现"></a>nginx互斥锁的实现</h1><p>发表于 2017-06-22 |</p>
+<p>nginx 基于原子操作、信号量以及文件锁实现了一个简单高效的互斥锁，当多个 worker 进程之间需要互斥操作时都会用到。下面来看下 nginx 是如何实现它的。</p>
+<h2 id="原子操作"><a href="#原子操作" class="headerlink" title="原子操作"></a>原子操作</h2><p>在实现互斥锁时用到了原子操作，先来了解一下 nginx 下提供的两个原子操作相关的函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> ngx_inline <span class="keyword">ngx_atomic_uint_t</span></span><br><span class="line">ngx_atomic_cmp_set(<span class="keyword">ngx_atomic_t</span> *lock, <span class="keyword">ngx_atomic_uint_t</span> old, <span class="keyword">ngx_atomic_uint_t</span> <span class="built_in">set</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> ngx_inline <span class="keyword">ngx_atomic_int_t</span></span><br><span class="line">ngx_atomic_fetch_add(<span class="keyword">ngx_atomic_t</span> *value, <span class="keyword">ngx_atomic_int_t</span> add)</span><br></pre></td></tr></table></figure>
+<p>第一个函数是一个 <code>CAS</code> 操作，首先它比较 <code>lock</code> 地址处的变量是否等于 <code>old</code>， 如果相等，就把 <code>lock</code> 地址处的变量设为 <code>set</code> 变返回成功，否则返回失败。注意上述过程是作为一个原子一起进行的，不会被打断。 用代码可以描述如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> ngx_inline <span class="keyword">ngx_atomic_uint_t</span></span><br><span class="line">ngx_atomic_cmp_set(<span class="keyword">ngx_atomic_t</span> *lock, <span class="keyword">ngx_atomic_uint_t</span> old, <span class="keyword">ngx_atomic_uint_t</span> <span class="built_in">set</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (*lock == old) &#123;</span><br><span class="line">        *lock = <span class="built_in">set</span>;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>第二个函数是读取 <code>value</code> 地址处的变量，并将其与 <code>add</code> 相加的结果再写入 <code>*lock</code>，然后返回原来 <code>*lock</code> 的值，这些操作也是作为一个整体完成的，不会被打断。用代码可描述如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> ngx_inline <span class="keyword">ngx_atomic_int_t</span></span><br><span class="line">ngx_atomic_fetch_add(<span class="keyword">ngx_atomic_t</span> *value, <span class="keyword">ngx_atomic_int_t</span> add)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">ngx_atomic_int_t</span>  old;</span><br><span class="line"></span><br><span class="line">    old = *value;</span><br><span class="line">    *value += add;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> old;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/03/16/nginx互斥锁的实现/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/02/15/Golang垃圾回收剖析/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2018/02/15/Golang垃圾回收剖析/" class="post-title-link" itemprop="url">Golang垃圾回收机制</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2018-02-15 12:11:22" itemprop="dateCreated datePublished" datetime="2018-02-15T12:11:22+08:00">2018-02-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2020-08-03 23:17:31" itemprop="dateModified" datetime="2020-08-03T23:17:31+08:00">2020-08-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/golang/" itemprop="url" rel="index"><span itemprop="name">golang</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>转载自：(<a href="http://legendtkl.com/2017/04/28/golang-gc/" target="_blank" rel="noopener">http://legendtkl.com/2017/04/28/golang-gc/</a>)</p>
+<h2 id="1-Golang-GC-发展"><a href="#1-Golang-GC-发展" class="headerlink" title="1.Golang GC 发展"></a>1.Golang GC 发展</h2><p>Golang 从第一个版本以来，GC 一直是大家诟病最多的。但是每一个版本的发布基本都伴随着 GC 的改进。下面列出一些比较重要的改动。</p>
+<ul>
+<li>v1.1 STW</li>
+<li>v1.3 Mark STW, Sweep 并行</li>
+<li>v1.5 三色标记法</li>
+<li>v1.8 hybrid write barrier</li>
+</ul>
+<h2 id="2-GC-算法简介"><a href="#2-GC-算法简介" class="headerlink" title="2. GC 算法简介"></a>2. GC 算法简介</h2><p>这一小节介绍三种经典的 GC 算法：引用计数（reference counting）、标记-清扫（mark &amp; sweep）、节点复制（Copying Garbage Collection），分代收集（Generational Garbage Collection）。</p>
+<h3 id="2-1-引用计数"><a href="#2-1-引用计数" class="headerlink" title="2.1 引用计数"></a>2.1 引用计数</h3><p>引用计数的思想非常简单：每个单元维护一个域，保存其它单元指向它的引用数量（类似有向图的入度）。当引用数量为 0 时，将其回收。引用计数是渐进式的，能够将内存管理的开销分布到整个程序之中。C++ 的 share_ptr 使用的就是引用计算方法。</p>
+<p>引用计数算法实现一般是把所有的单元放在一个单元池里，比如类似 free list。这样所有的单元就被串起来了，就可以进行引用计数了。新分配的单元计数值被设置为 1（注意不是 0，因为申请一般都说 ptr = new object 这种）。每次有一个指针被设为指向该单元时，该单元的计数值加 1；而每次删除某个指向它的指针时，它的计数值减 1。当其引用计数为 0 的时候，该单元会被进行回收。虽然这里说的比较简单，实现的时候还是有很多细节需要考虑，比如删除某个单元的时候，那么它指向的所有单元都需要对引用计数减 1。那么如果这个时候，发现其中某个指向的单元的引用计数又为 0，那么是递归的进行还是采用其他的策略呢？递归处理的话会导致系统颠簸。关于这些细节这里就不讨论了，可以参考文章后面的给的参考资料。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2018/02/15/Golang垃圾回收剖析/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
     <link itemprop="mainEntityOfPage" href="http://yoursite.com/2017/09/15/nginx-信号处理/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -928,196 +1107,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2016/01/15/sock5协议原理分析/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Yujie">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="KnifeFly">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2016/01/15/sock5协议原理分析/" class="post-title-link" itemprop="url">sock5协议原理分析</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2016-01-15 22:47:03" itemprop="dateCreated datePublished" datetime="2016-01-15T22:47:03+08:00">2016-01-15</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2020-08-03 23:14:04" itemprop="dateModified" datetime="2020-08-03T23:14:04+08:00">2020-08-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/net/" itemprop="url" rel="index"><span itemprop="name">net</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>早点两年前就开始使用shadowsocks了,那时候买了搬瓦工一年19$的vps,由于搬瓦工数据中心比较少,且大部分位于美国,经过测试选了个在凤凰城的机房,但是网速一直不稳定时不时的断线,前阵子买了vultr位于东京数据中心的vps,网络稳定,看youtube 1080p 毫无压力.虽然用了很久的shandowsock5,但是一直对sock5协知之甚少,决定解下这个牛逼的翻墙协议,简单的说就是在墙外搭一个sock5服务器,墙内的客户端把tcp数据加密后发往墙外的服务器,server按照sock5协议解密后再发往目标机器</p>
-<div style="align: center"><br><img src="https://yuerblog.cc/wp-content/uploads/2016/11/WechatIMG938.jpeg" width="100%" height="100%"><br></div>
-
-<ol>
-<li>PC客户端（即你的电脑）发出请求基于Socks5协议跟SS-Local端进行通讯，由于这个SS-Local一般是本机或路由器等局域网的其他机器，不经过GFW，所以解决GFW通过特征分析进行干扰的问题</li>
-<li>SS-Local和SS-Server两端通过多种可选的加密方法(“aes-256-cfb”等)进行通讯，经过GFW的时候因为是常规的TCP包，没有明显特征码GFW也无法对通讯数据进行解密</li>
-<li>SS-Server将收到的加密数据进行解密，还原初始请求，再发送到用户需要访问的服务网站，获取响应原路再返回SS-04，返回途中依然使用了加密，使得流量是普通TCP包，并成功穿过GFW防火墙</li>
-</ol>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2016/01/15/sock5协议原理分析/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2016/01/15/linux-守护进程/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Yujie">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="KnifeFly">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2016/01/15/linux-守护进程/" class="post-title-link" itemprop="url">linux 守护进程</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2016-01-15 12:11:22" itemprop="dateCreated datePublished" datetime="2016-01-15T12:11:22+08:00">2016-01-15</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2020-08-03 23:13:47" itemprop="dateModified" datetime="2020-08-03T23:13:47+08:00">2020-08-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/linux/" itemprop="url" rel="index"><span itemprop="name">linux</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="守护进程"><a href="#守护进程" class="headerlink" title="守护进程"></a>守护进程</h1><p>linux 服务端程序很多都是以守护进程的方式对外提供服务, linux 系统本身也有很多守护进程,例如kthreadd用来创建内核进程, kswapd是内存换页守护进程,flush是dump内存中的脏页面到磁盘,jbd提供ext4文件系统的日志日志功能…守护进程命名大部分都是以d结尾. 大部分守护进程都是以root方式运行,没有控制终端,运行在后台. 大部分守护进程都是进程组的组长进程以及会话的首进程,而且是进程组和会话中的唯一进程. 守护进程的父进程一般是系统1号进程,例如initd或者systemd.</p>
-<h1 id="编程规则"><a href="#编程规则" class="headerlink" title="编程规则"></a>编程规则</h1><p>为了让守护进程在后台运行,减少不必要的交互,守护进程的编写有一套编程规则:</p>
-<ul>
-<li>umask将文件模式创建屏蔽字设置一个已知值,通常是0. 由于继承得来的文件模式屏蔽字可能会被设置为拒绝某些权限.</li>
-<li>fork() 然后父进程exit<ul>
-<li>如果守护进程是以shell命令启动, 父进程exit会让shell认为这条命令已经执行完毕</li>
-<li>虽然子进程继承了父进程的进程组ID, 但获得了一个新的进程ID,这保证了子进程不是一个进程组的组长进程  (setid调用的条件)</li>
-</ul>
-</li>
-<li>调用setid创建一个新会话, 如果调用setsid的进程不是一个进程组的组长，此函数创建一个新的会话期setid,setid会让子进程执行三个步骤<ul>
-<li>让子进程成为新会话的首进程</li>
-<li>让子进程成为新进程组的组长进程</li>
-<li>让子进程没有控制终端,如果在调用setsid前，该进程有控制终端，那么与该终端的联系被解除。 如果该进程是一个进程组的组长，此函数返回错误</li>
-<li>为了保证这一点，我们先调用fork()然后exit()，此时只有子进程在运行</li>
-</ul>
-</li>
-<li>再次fork, 这个步骤有些守护进程没有. 此时进程已经成为无终端的会话组长,但它可以重新申请打开一个控制终端,为了使进程不再成为会话组长来禁止进程重新打开控制终端, 再次fork然后父进程exit</li>
-<li>设置工作目录为根目录, 从父进程继承过来的当前工作目录可能在一个挂载的文件系统中</li>
-<li>关闭不再需要的文件描述符</li>
-<li>打开/dev/null, 让文件描述符0 1 2都指向/dev/null</li>
-<li>处理SIGCHLD信号, 处理SIGCHLD信号并不是必须的</li>
-</ul>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2016/01/15/linux-守护进程/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1187,7 +1176,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">41</span>
+          <span class="site-state-item-count">43</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -1200,7 +1189,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-count">20</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>

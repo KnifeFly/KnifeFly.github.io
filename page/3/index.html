@@ -160,6 +160,193 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/02/14/kafka高可用设计(下)/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2019/02/14/kafka高可用设计(下)/" class="post-title-link" itemprop="url">kafka高可用设计(下)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2019-02-14 23:01:22" itemprop="dateCreated datePublished" datetime="2019-02-14T23:01:22+08:00">2019-02-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2020-08-03 23:12:30" itemprop="dateModified" datetime="2020-08-03T23:12:30+08:00">2020-08-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/BigData/" itemprop="url" rel="index"><span itemprop="name">BigData</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>本文转发自<a href="http://www.jasongj.com/" target="_blank" rel="noopener"><strong>技术世界</strong></a>，<a href="http://www.jasongj.com/2015/06/08/KafkaColumn3" target="_blank" rel="noopener">原文链接</a>　<a href="http://www.jasongj.com/2015/06/08/KafkaColumn3" target="_blank" rel="noopener">http://www.jasongj.com/2015/06/08/KafkaColumn3</a></p>
+<p>本文在上篇文章 基础上，更加深入讲解了Kafka的HA机制，主要阐述了HA相关各种场景，如Broker failover，Controller failover，Topic创建/删除，Broker启动，Follower从Leader fetch数据等详细处理过程。同时介绍了Kafka提供的与Replication相关的工具，如重新分配Partition等。</p>
+<h1 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h1><p>　　本文在上篇文章基础上，更加深入讲解了Kafka的HA机制，主要阐述了HA相关各种场景，如Broker failover，Controller failover，Topic创建/删除，Broker启动，Follower从Leader fetch数据等详细处理过程。同时介绍了Kafka提供的与Replication相关的工具，如重新分配Partition等。</p>
+<h1 id="Broker-Failover过程"><a href="#Broker-Failover过程" class="headerlink" title="Broker Failover过程"></a>Broker Failover过程</h1><h2 id="Controller对Broker-failure的处理过程"><a href="#Controller对Broker-failure的处理过程" class="headerlink" title="Controller对Broker failure的处理过程"></a>Controller对Broker failure的处理过程</h2><ol>
+<li>Controller在Zookeeper的<code>/brokers/ids</code>节点上注册Watch。一旦有Broker宕机（本文用宕机代表任何让Kafka认为其Broker die的情景，包括但不限于机器断电，网络不可用，GC导致的Stop The World，进程crash等），其在Zookeeper对应的Znode会自动被删除，Zookeeper会fire Controller注册的Watch，Controller即可获取最新的幸存的Broker列表。</li>
+<li>Controller决定set_p，该集合包含了宕机的所有Broker上的所有Partition。</li>
+<li>对set_p中的每一个Partition：<br>　　3.1 从<code>/brokers/topics/[topic]/partitions/[partition]/state</code>读取该Partition当前的ISR。<br>　　3.2 决定该Partition的新Leader。如果当前ISR中有至少一个Replica还幸存，则选择其中一个作为新Leader，新的ISR则包含当前ISR中所有幸存的Replica。否则选择该Partition中任意一个幸存的Replica作为新的Leader以及ISR（该场景下可能会有潜在的数据丢失）。如果该Partition的所有Replica都宕机了，则将新的Leader设置为-1。<br>　　3.3 将新的Leader，ISR和新的<code>leader_epoch</code>及<code>controller_epoch</code>写入<code>/brokers/topics/[topic]/partitions/[partition]/state</code>。注意，该操作只有Controller版本在3.1至3.3的过程中无变化时才会执行，否则跳转到3.1。</li>
+<li>直接通过RPC向set_p相关的Broker发送LeaderAndISRRequest命令。Controller可以在一个RPC操作中发送多个命令从而提高效率。<br>　　Broker failover顺序图如下所示。<br><a href="http://www.jasongj.com/img/kafka/KafkaColumn2/kafka_broker_failover.png" target="_blank" rel="noopener"><img src="http://www.jasongj.com/img/kafka/KafkaColumn2/kafka_broker_failover.png" alt="broker failover sequence diagram "></a></li>
+</ol>
+<p>　　LeaderAndIsrRequest结构如下<br><a href="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrRequest.png" target="_blank" rel="noopener"><img src="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrRequest.png" alt="LeaderAndIsrRequest"></a></p>
+<p>　　LeaderAndIsrResponse结构如下<br><a href="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrResponse.png" target="_blank" rel="noopener"><img src="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrResponse.png" alt="LeaderAndIsrResponse"></a></p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2019/02/14/kafka高可用设计(下)/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/01/03/kafka运营-NotLeaderForPartitionException异常/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2019/01/03/kafka运营-NotLeaderForPartitionException异常/" class="post-title-link" itemprop="url">Kafka运营-NotLeaderForPartitionException异常</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2019-01-03 12:11:22" itemprop="dateCreated datePublished" datetime="2019-01-03T12:11:22+08:00">2019-01-03</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2020-08-03 23:12:30" itemprop="dateModified" datetime="2020-08-03T23:12:30+08:00">2020-08-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/BigData/" itemprop="url" rel="index"><span itemprop="name">BigData</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="Kafka-NotLeaderForPartitionException异常"><a href="#Kafka-NotLeaderForPartitionException异常" class="headerlink" title="Kafka NotLeaderForPartitionException异常"></a>Kafka NotLeaderForPartitionException异常</h2><h3 id="异常分析"><a href="#异常分析" class="headerlink" title="异常分析"></a>异常分析</h3><p>1.Kafka日志分析</p>
+<p>发现Kafka日志中有比较多的org.apache.kafka.common.errors.NotLeaderForPartitionException异常信息，该异常从字面解释就是某个分区的leader找不到，具体异常信息如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2019</span>-<span class="number">01</span>-<span class="number">18</span> <span class="number">22</span>:<span class="number">01</span>:<span class="number">00</span>,<span class="number">802</span> ERROR kafka.server.ReplicaFetcherThread: [ReplicaFetcherThread-<span class="number">0</span>-<span class="number">118</span>]: Error <span class="keyword">for</span> partition [kafka_custflow_topic_test,<span class="number">5</span>] to broker <span class="number">118</span>:org.apache.kafka.common.errors.NotLeaderForPartitionException: This server is not the leader <span class="keyword">for</span> that topic-partition.</span><br></pre></td></tr></table></figure>
+<p>通常来说该异常信息是由于kafka和zk连接存在超时，接着导致Controller重新选举导致获取元数据不正确，timed out的那台Broker所持有的partition就会出现NotLeaderForPartitionException，kafka中连接zk超时日志格式信息如下:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">2019-01-18 21:59:55,916 WARN org.apache.zookeeper.ClientCnxn: Client session timed out, have not heard from server in 7329ms for sessionid 0x2677edb3ac1f8d5</span><br><span class="line">2019-01-18 21:59:55,916 INFO org.apache.zookeeper.ClientCnxn: Client session timed out, have not heard from server in 7329ms for sessionid 0x2677edb3ac1f8d5, closing socket connection and attempting reconnect</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">2019-01-18 21:59:56,075 INFO org.apache.zookeeper.ClientCnxn: Opening socket connection to server mfsmaster/121.9.240.249:2181. Will not attempt to authenticate using SASL (unknown error)</span><br><span class="line">2019-01-18 21:59:56,075 INFO org.apache.zookeeper.ClientCnxn: Socket connection established to mfsmaster/121.9.240.249:2181, initiating session</span><br><span class="line">2019-01-18 21:59:56,080 WARN org.apache.zookeeper.ClientCnxn: Unable to reconnect to ZooKeeper service, session 0x2677edb3ac1f8d5 has expired</span><br><span class="line">2019-01-18 21:59:56,080 INFO org.I0Itec.zkclient.ZkClient: zookeeper state changed (Expired)</span><br><span class="line">2019-01-18 21:59:56,080 INFO org.apache.zookeeper.ClientCnxn: Unable to reconnect to ZooKeeper service, session 0x2677edb3ac1f8d5 has expired, closing socket connection</span><br><span class="line">2019-01-18 21:59:56,080 INFO org.apache.zookeeper.ZooKeeper: Initiating client connection, connectString=SR-CNSX-GDFS-240-251:2181,SR-CNSX-GDFS-240-252:2181,SR-CNSX-GDFS-240-253:2181,mfslogger:2181,mfsmaster:2181/kafka sessionTimeout=6000 watcher=org.I0Itec.zkclient.ZkClient@7957dc72</span><br><span class="line">2019-01-18 21:59:56,080 INFO org.apache.zookeeper.ClientCnxn: EventThread shut down for session: 0x2677edb3ac1f8d5</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">2019-01-18 21:59:56,094 INFO org.I0Itec.zkclient.ZkClient: zookeeper state changed (SyncConnected)</span><br><span class="line">2019-01-18 21:59:56,095 INFO kafka.server.KafkaHealthcheck$SessionExpireListener: re-registering broker info in ZK for broker 121</span><br><span class="line">2019-01-18 21:59:56,095 INFO kafka.utils.ZKCheckedEphemeral: Creating /brokers/ids/121 (is it secure? false)</span><br><span class="line">2019-01-18 21:59:56,112 INFO kafka.utils.ZKCheckedEphemeral: Result of znode creation is: OK</span><br><span class="line">2019-01-18 21:59:56,113 INFO kafka.utils.ZkUtils: Registered broker 121 at path /brokers/ids/121 with addresses: EndPoint(SR-CNSX-GDFS-240-252,9092,ListenerName(PLAINTEXT),PLAINTEXT)</span><br><span class="line">2019-01-18 21:59:56,113 INFO kafka.server.KafkaHealthcheck$SessionExpireListener: done re-registering broker</span><br><span class="line">2019-01-18 21:59:56,113 INFO kafka.server.KafkaHealthcheck$SessionExpireListener: Subscribing to /brokers/topics path to watch for new topics</span><br></pre></td></tr></table></figure>
+<p>2.zk日志分析</p>
+<p>同时分析zk日志信息：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">2019-01-18 21:59:55,961 WARN org.apache.zookeeper.server.NIOServerCnxn: caught end of stream exception</span><br><span class="line">EndOfStreamException: Unable to read additional data from client sessionid 0x2677edb3ac1f8d5, likely client has closed socket</span><br><span class="line">        at org.apache.zookeeper.server.NIOServerCnxn.doIO(NIOServerCnxn.java:231)</span><br><span class="line">        at org.apache.zookeeper.server.NIOServerCnxnFactory.run(NIOServerCnxnFactory.java:208)</span><br><span class="line">        at java.lang.Thread.run(Thread.java:748)</span><br><span class="line">2019-01-18 21:59:55,962 INFO org.apache.zookeeper.server.NIOServerCnxn: Closed socket connection for client /121.9.240.252:40660 which had sessionid 0x2677edb3ac1f8d5</span><br><span class="line">2019-01-18 21:59:56,001 INFO org.apache.zookeeper.server.ZooKeeperServer: Expiring session 0x2677edb3ac1f8d5, timeout of 6000ms exceeded</span><br><span class="line">2019-01-18 21:59:56,001 INFO org.apache.zookeeper.server.PrepRequestProcessor: Processed session termination for sessionid: 0x2677edb3ac1f8d5</span><br></pre></td></tr></table></figure>
+<p>综合zk和kafka日志信息，可以看出kafka和zk session超时之后，session会被zk主动关闭，之后kafka会重新连接到zk集群，基本是在1s之内kafka新的session已经建立，所以从短时间内kafka服务没问题。</p>
+<p>3.gc日志分析</p>
+<p>Gc 日志中基本没有Full GC</p>
+<p>4.系统资源分析</p>
+<ul>
+<li>晚上9~10业务晚高峰，数据量通常比较大</li>
+<li>CPU 内存正常</li>
+<li>IO在晚高峰时存在突刺</li>
+</ul>
+<h3 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h3><p>1.kafka增大session time out </p>
+<p>当前默认值是6s，可适当加大超时时间</p>
+<p>2.增加kafka磁盘</p>
+<p>3.增加磁盘IO处理线程数</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
     <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/07/15/MySQL 读书笔记-索引/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -956,185 +1143,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/03/16/nginx互斥锁的实现/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Yujie">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="KnifeFly">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/03/16/nginx互斥锁的实现/" class="post-title-link" itemprop="url">nginx互斥锁的实现</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2018-03-16 11:15:22" itemprop="dateCreated datePublished" datetime="2018-03-16T11:15:22+08:00">2018-03-16</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2020-08-03 23:13:15" itemprop="dateModified" datetime="2020-08-03T23:13:15+08:00">2020-08-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/nginx/" itemprop="url" rel="index"><span itemprop="name">nginx</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="nginx互斥锁的实现"><a href="#nginx互斥锁的实现" class="headerlink" title="nginx互斥锁的实现"></a>nginx互斥锁的实现</h1><p>发表于 2017-06-22 |</p>
-<p>nginx 基于原子操作、信号量以及文件锁实现了一个简单高效的互斥锁，当多个 worker 进程之间需要互斥操作时都会用到。下面来看下 nginx 是如何实现它的。</p>
-<h2 id="原子操作"><a href="#原子操作" class="headerlink" title="原子操作"></a>原子操作</h2><p>在实现互斥锁时用到了原子操作，先来了解一下 nginx 下提供的两个原子操作相关的函数：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> ngx_inline <span class="keyword">ngx_atomic_uint_t</span></span><br><span class="line">ngx_atomic_cmp_set(<span class="keyword">ngx_atomic_t</span> *lock, <span class="keyword">ngx_atomic_uint_t</span> old, <span class="keyword">ngx_atomic_uint_t</span> <span class="built_in">set</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> ngx_inline <span class="keyword">ngx_atomic_int_t</span></span><br><span class="line">ngx_atomic_fetch_add(<span class="keyword">ngx_atomic_t</span> *value, <span class="keyword">ngx_atomic_int_t</span> add)</span><br></pre></td></tr></table></figure>
-<p>第一个函数是一个 <code>CAS</code> 操作，首先它比较 <code>lock</code> 地址处的变量是否等于 <code>old</code>， 如果相等，就把 <code>lock</code> 地址处的变量设为 <code>set</code> 变返回成功，否则返回失败。注意上述过程是作为一个原子一起进行的，不会被打断。 用代码可以描述如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> ngx_inline <span class="keyword">ngx_atomic_uint_t</span></span><br><span class="line">ngx_atomic_cmp_set(<span class="keyword">ngx_atomic_t</span> *lock, <span class="keyword">ngx_atomic_uint_t</span> old, <span class="keyword">ngx_atomic_uint_t</span> <span class="built_in">set</span>)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (*lock == old) &#123;</span><br><span class="line">        *lock = <span class="built_in">set</span>;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>第二个函数是读取 <code>value</code> 地址处的变量，并将其与 <code>add</code> 相加的结果再写入 <code>*lock</code>，然后返回原来 <code>*lock</code> 的值，这些操作也是作为一个整体完成的，不会被打断。用代码可描述如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> ngx_inline <span class="keyword">ngx_atomic_int_t</span></span><br><span class="line">ngx_atomic_fetch_add(<span class="keyword">ngx_atomic_t</span> *value, <span class="keyword">ngx_atomic_int_t</span> add)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">ngx_atomic_int_t</span>  old;</span><br><span class="line"></span><br><span class="line">    old = *value;</span><br><span class="line">    *value += add;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> old;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2018/03/16/nginx互斥锁的实现/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/02/15/Golang垃圾回收剖析/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Yujie">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="KnifeFly">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2018/02/15/Golang垃圾回收剖析/" class="post-title-link" itemprop="url">Golang垃圾回收机制</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2018-02-15 12:11:22" itemprop="dateCreated datePublished" datetime="2018-02-15T12:11:22+08:00">2018-02-15</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2020-08-03 23:17:31" itemprop="dateModified" datetime="2020-08-03T23:17:31+08:00">2020-08-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/golang/" itemprop="url" rel="index"><span itemprop="name">golang</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>转载自：(<a href="http://legendtkl.com/2017/04/28/golang-gc/" target="_blank" rel="noopener">http://legendtkl.com/2017/04/28/golang-gc/</a>)</p>
-<h2 id="1-Golang-GC-发展"><a href="#1-Golang-GC-发展" class="headerlink" title="1.Golang GC 发展"></a>1.Golang GC 发展</h2><p>Golang 从第一个版本以来，GC 一直是大家诟病最多的。但是每一个版本的发布基本都伴随着 GC 的改进。下面列出一些比较重要的改动。</p>
-<ul>
-<li>v1.1 STW</li>
-<li>v1.3 Mark STW, Sweep 并行</li>
-<li>v1.5 三色标记法</li>
-<li>v1.8 hybrid write barrier</li>
-</ul>
-<h2 id="2-GC-算法简介"><a href="#2-GC-算法简介" class="headerlink" title="2. GC 算法简介"></a>2. GC 算法简介</h2><p>这一小节介绍三种经典的 GC 算法：引用计数（reference counting）、标记-清扫（mark &amp; sweep）、节点复制（Copying Garbage Collection），分代收集（Generational Garbage Collection）。</p>
-<h3 id="2-1-引用计数"><a href="#2-1-引用计数" class="headerlink" title="2.1 引用计数"></a>2.1 引用计数</h3><p>引用计数的思想非常简单：每个单元维护一个域，保存其它单元指向它的引用数量（类似有向图的入度）。当引用数量为 0 时，将其回收。引用计数是渐进式的，能够将内存管理的开销分布到整个程序之中。C++ 的 share_ptr 使用的就是引用计算方法。</p>
-<p>引用计数算法实现一般是把所有的单元放在一个单元池里，比如类似 free list。这样所有的单元就被串起来了，就可以进行引用计数了。新分配的单元计数值被设置为 1（注意不是 0，因为申请一般都说 ptr = new object 这种）。每次有一个指针被设为指向该单元时，该单元的计数值加 1；而每次删除某个指向它的指针时，它的计数值减 1。当其引用计数为 0 的时候，该单元会被进行回收。虽然这里说的比较简单，实现的时候还是有很多细节需要考虑，比如删除某个单元的时候，那么它指向的所有单元都需要对引用计数减 1。那么如果这个时候，发现其中某个指向的单元的引用计数又为 0，那么是递归的进行还是采用其他的策略呢？递归处理的话会导致系统颠簸。关于这些细节这里就不讨论了，可以参考文章后面的给的参考资料。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2018/02/15/Golang垃圾回收剖析/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1204,7 +1212,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">41</span>
+          <span class="site-state-item-count">43</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -1217,7 +1225,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-count">20</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 3.7.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="Spark standlone master HA 原理分析spark standlone 高可用集群架构大概如下，集群中启动多个master节点，其中只有一个master是active，其余master为backup。当集群中active master crash的时候，standby master通过zookeeper会选举出新的active机器，集群恢复工作。在这个集群恢复的工程中，已经提交">
+<meta name="keywords" content="Spark">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark Standlone HA 原理分析">
+<meta property="og:url" content="http://yoursite.com/2019/08/01/Spark Standlon HA 深入分析/index.html">
+<meta property="og:site_name" content="KnifeFly">
+<meta property="og:description" content="Spark standlone master HA 原理分析spark standlone 高可用集群架构大概如下，集群中启动多个master节点，其中只有一个master是active，其余master为backup。当集群中active master crash的时候，standby master通过zookeeper会选举出新的active机器，集群恢复工作。在这个集群恢复的工程中，已经提交">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:image" content="http://yoursite.com/2019/08/01/images/spark_standlone_overview.jpg">
+<meta property="og:updated_time" content="2020-11-13T14:03:00.398Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Spark Standlone HA 原理分析">
+<meta name="twitter:description" content="Spark standlone master HA 原理分析spark standlone 高可用集群架构大概如下，集群中启动多个master节点，其中只有一个master是active，其余master为backup。当集群中active master crash的时候，standby master通过zookeeper会选举出新的active机器，集群恢复工作。在这个集群恢复的工程中，已经提交">
+<meta name="twitter:image" content="http://yoursite.com/2019/08/01/images/spark_standlone_overview.jpg">
+
+<link rel="canonical" href="http://yoursite.com/2019/08/01/Spark Standlon HA 深入分析/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>Spark Standlone HA 原理分析 | KnifeFly</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">KnifeFly</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/08/01/Spark Standlon HA 深入分析/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Spark Standlone HA 原理分析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2019-08-01 14:29:01" itemprop="dateCreated datePublished" datetime="2019-08-01T14:29:01+08:00">2019-08-01</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2020-11-13 22:03:00" itemprop="dateModified" datetime="2020-11-13T22:03:00+08:00">2020-11-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/BigData/" itemprop="url" rel="index"><span itemprop="name">BigData</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="Spark-standlone-master-HA-原理分析"><a href="#Spark-standlone-master-HA-原理分析" class="headerlink" title="Spark standlone master HA 原理分析"></a>Spark standlone master HA 原理分析</h1><p>spark standlone 高可用集群架构大概如下，集群中启动多个master节点，其中只有一个master是active，其余master为backup。当集群中active master crash的时候，standby master通过zookeeper会选举出新的active机器，集群恢复工作。在这个集群恢复的工程中，已经提交的spark任务不受影响，standby master在被选举为active master大概需要1~2分钟，这期间master将无法提交新的任务。</p>
+<p>spark standlone master HA集群架构大体如下：</p>
+<p><img src="../images/spark_standlone_overview.jpg" alt="logbeat"></p>
+<p>Spark采用<a href="https://curator.apache.org/" target="_blank" rel="noopener">apache curator</a>连接zookeeper进行active master选举，zookeeper提供API比较底层操作的是数据结构和节点的状态，<a href="https://curator.apache.org/" target="_blank" rel="noopener">apache curator</a>进行了一层封装，提供了比较高阶的API。</p>
+<h2 id="高可用基本原理"><a href="#高可用基本原理" class="headerlink" title="高可用基本原理"></a>高可用基本原理</h2><p>Spark master 高可用的基本原理是使用了Zookeeper进行了active选举，简单的说是使用了zookeeper作为实现leader选举，多台master机器在启动进行leader选举，如果选举成功则成为active master，并把自己的IP信息写到zookeeper节点中，其余未选举成功的的master失败成为standby master。standby master并且会在zookeeper上watch节点的变化，如果节点状态变化，意味着active master存在异常，那么则会触发新一轮active master选举。</p>
+<p>在Zookeeper上创建的临时节点来实现leader election，如果应用程序和zookeeper之间Session超时，会导致zookeeper删除临时节点，此时也会触发leader election。在生产环境下，如果采用Java写的应用程序负载高，Full GC此时有可能会导致应用程序和Zookeeper Session超时。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[_c_aa37b1e8-3feb-49ec-9ab7-7c97038e4747-latch-0000000000, _c_b7fa02ab-e344-41cf-b2e0-29afaddd469d-latch-0000000001]</span><br></pre></td></tr></table></figure>
+<p>Spark默认把zookeeper选举节点存放在<code>/spark/leader_election</code>路径上，zk节点类型是<code>ephemeral节点</code>，节点名称前部分是一个UUID，后面部分是一个序列号，通常来说序号小的是<code>leader</code></p>
+<p>Spark standlone 模式下在提交应用程序或者集群添加节点时，会把应用程序以及节点信息持久化到Zookeeper节点中。<code>active master</code>选举成功后，会从zookeeper节点中读取应用程序列表和worker节点列表，并开始进入<code>RECOVERING</code>状态；如果zookeeper节点汇总应用程序列表和worker节点列表都为空，直接进入<code>ALIVE</code>状态</p>
+<a id="more"></a>
+<h2 id="高可用代码分析"><a href="#高可用代码分析" class="headerlink" title="高可用代码分析"></a>高可用代码分析</h2><h3 id="active-master-选举分析"><a href="#active-master-选举分析" class="headerlink" title="active master 选举分析"></a>active master 选举分析</h3><p>Spark使用curator来实现active master抢占的代码看起来也非常简单，主要工作是使了 <code>LeaderLatch</code>并且注册<code>LeaderLatchListener</code>回调，<code>LeaderLatchListener</code>监听器接口主要有两个方法:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">LeaderLatchListener</span></span></span><br><span class="line"><span class="class"></span>&#123;</span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">isLeader</span><span class="params">()</span></span>;</span><br><span class="line"></span><br><span class="line">  <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">notLeader</span><span class="params">()</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ol>
+<li><p><code>isLeader</code>回调函数会在<code>LeaderLatch</code>状态从(hasLeadership = false) -&gt; (hasLeadership = true)的时候触发</p>
+</li>
+<li><p><code>notLeader</code>回调函数会在<code>LeaderLatch</code>状态从(hasLeadership = true) -&gt; (hasLeadership = false)的时候触发</p>
+</li>
+</ol>
+<p>Spark在<code>isLeader</code>回调函数中，先设置内部状态为<code>leader</code>，然后开始执行<code>RECOVERING</code>过程</p>
+<p>Spark在<code>notLeader</code>回调函数中，看起来只是打印了日志</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">var</span> zk: <span class="type">CuratorFramework</span> = _</span><br><span class="line"><span class="keyword">private</span> <span class="keyword">var</span> leaderLatch: <span class="type">LeaderLatch</span> = _</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">start</span></span>() &#123;</span><br><span class="line">  logInfo(<span class="string">"Starting ZooKeeper LeaderElection agent"</span>)</span><br><span class="line">  zk = <span class="type">CuratorUtil</span>.newClient(conf)</span><br><span class="line">  leaderLatch = <span class="keyword">new</span> <span class="type">LeaderLatch</span>(zk, workingDir)</span><br><span class="line">  leaderLatch.addListener(<span class="keyword">this</span>)</span><br><span class="line">  leaderLatch.start()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">isLeader</span></span>() &#123;</span><br><span class="line">  synchronized &#123;</span><br><span class="line">    <span class="comment">// could have lost leadership by now.</span></span><br><span class="line">    <span class="keyword">if</span> (!leaderLatch.hasLeadership) &#123;</span><br><span class="line">      <span class="keyword">return</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    logInfo(<span class="string">"We have gained leadership"</span>)</span><br><span class="line">    updateLeadershipStatus(<span class="literal">true</span>)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">notLeader</span></span>() &#123;</span><br><span class="line">  synchronized &#123;</span><br><span class="line">    <span class="comment">// could have gained leadership by now.</span></span><br><span class="line">    <span class="keyword">if</span> (leaderLatch.hasLeadership) &#123;</span><br><span class="line">      <span class="keyword">return</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    logInfo(<span class="string">"We have lost leadership"</span>)</span><br><span class="line">    updateLeadershipStatus(<span class="literal">false</span>)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="active-master-恢复分析"><a href="#active-master-恢复分析" class="headerlink" title="active master 恢复分析"></a>active master 恢复分析</h3><p>当<code>active master</code>故障宕机后，<code>standby master</code>成为新的<code>active master</code>之后，会先检查集群状态并且做故障恢复</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">case</span> <span class="type">ElectedLeader</span> =&gt;</span><br><span class="line">      <span class="keyword">val</span> (storedApps, storedWorkers) = persistenceEngine.readPersistedData(rpcEnv)</span><br><span class="line">      state = <span class="keyword">if</span> (storedApps.isEmpty &amp;&amp; storedWorkers.isEmpty) &#123;</span><br><span class="line">        <span class="type">RecoveryState</span>.<span class="type">ALIVE</span></span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="type">RecoveryState</span>.<span class="type">RECOVERING</span></span><br><span class="line">      &#125;</span><br><span class="line">      logInfo(<span class="string">"I have been elected as leader! New state: "</span> + state)</span><br><span class="line">      <span class="keyword">if</span> (state == <span class="type">RecoveryState</span>.<span class="type">RECOVERING</span>) &#123;</span><br><span class="line">        beginRecovery(storedApps, storedWorkers)</span><br><span class="line">        recoveryCompletionTask = forwardMessageThread.schedule(<span class="keyword">new</span> <span class="type">Runnable</span> &#123;</span><br><span class="line">          <span class="keyword">override</span> <span class="function"><span class="keyword">def</span> <span class="title">run</span></span>(): <span class="type">Unit</span> = <span class="type">Utils</span>.tryLogNonFatalError &#123;</span><br><span class="line">            self.send(<span class="type">CompleteRecovery</span>)</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;, workerTimeoutMs, <span class="type">TimeUnit</span>.<span class="type">MILLISECONDS</span>)</span><br><span class="line">      &#125;</span><br></pre></td></tr></table></figure>
+<p>spark把driver/app/worker列表信息保存在<code>/spark/master_status</code>路径下，spark采用Java序列化保存了<code>DriverInfo</code>、<code>ApplicationInfo</code>、<code>WorkInfo</code>，故障恢复的主要部分就是读取zk上序列化的数据，反序列化出相应的数据结构</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[app_app-20201110095444-0000, worker_worker-20201110095337-127.0.0.1-9001]</span><br></pre></td></tr></table></figure>
+<p>Spark反序列化相应的数据结构之后，会重新注册application/worker：</p>
+<ol>
+<li>zookeeper里面保存的是正在运行的application，所以spark反序列化之后的数据结里面是crash之前正在运行的application，这些application有可能当前正在运行。此时有可能会导致，<strong>这些当前还在运行或者已经运行结束的application会重复注册</strong></li>
+<li>注册完Application 并没有马上进行Application的调度，直到恢复完Worker，Driver才开始进行进行</li>
+</ol>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">beginRecovery</span></span>(storedApps: <span class="type">Seq</span>[<span class="type">ApplicationInfo</span>], storedWorkers: <span class="type">Seq</span>[<span class="type">WorkerInfo</span>]) &#123;</span><br><span class="line">    <span class="keyword">for</span> (app &lt;- storedApps) &#123;</span><br><span class="line">      <span class="keyword">if</span>(!app.launched) &#123;</span><br><span class="line">        registerApplication(app)</span><br><span class="line">      &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        app.state = <span class="type">ApplicationState</span>.<span class="type">UNKNOWN</span></span><br><span class="line">        apps += app</span><br><span class="line">        idToApp(app.id) = app</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (worker &lt;- storedWorkers) &#123;</span><br><span class="line">      logInfo(<span class="string">"Trying to recover worker: "</span> + worker.id)</span><br><span class="line">      <span class="keyword">try</span> &#123;</span><br><span class="line">        registerWorker(worker)</span><br><span class="line">        worker.state = <span class="type">WorkerState</span>.<span class="type">UNKNOWN</span></span><br><span class="line">        worker.endpoint.send(<span class="type">MasterChanged</span>(self))</span><br><span class="line">      &#125; <span class="keyword">catch</span> &#123;</span><br><span class="line">        <span class="keyword">case</span> e: <span class="type">Exception</span> =&gt; logInfo(<span class="string">"Worker "</span> + worker.id + <span class="string">" had exception on reconnect"</span>)</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+<p>spark在恢复worker列表的时候，大概做了以下事情:</p>
+<ol>
+<li>重新注册worker，会剔除<code>DEAD</code>状态的worker</li>
+<li>设置每台worker状态为<code>UNKNOW</code></li>
+<li>给每台worker发送<code>MasterChanged</code>数据包</li>
+<li>worker会响应<code>MasterChanged</code>数据包，会把<code>workerId</code>和<code>runningApps</code>响应给master</li>
+</ol>
+<p><code>active master</code>状态在<strong>等待worker response timeout</strong>后，从<code>RECOVERING</code> -&gt; <code>COMPLETING_RECOVERY</code>之后，在completeRecovery 的函数里，会剔除一些没有响应的worker，以及没有归属的application。只有当Master的节点的状态RecoveryState.ALIVE的时候，Master才调用了Schedule重新调度已经注册的Application。</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="function"><span class="keyword">def</span> <span class="title">completeRecovery</span></span>() &#123;</span><br><span class="line">    <span class="comment">// Ensure "only-once" recovery semantics using a short synchronization period.</span></span><br><span class="line">    <span class="keyword">if</span> (state != <span class="type">RecoveryState</span>.<span class="type">RECOVERING</span>) &#123; <span class="keyword">return</span> &#125;</span><br><span class="line">    state = <span class="type">RecoveryState</span>.<span class="type">COMPLETING_RECOVERY</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// Kill off any workers and apps that didn't respond to us.</span></span><br><span class="line">    workers.filter(_.state == <span class="type">WorkerState</span>.<span class="type">UNKNOWN</span>).foreach(</span><br><span class="line">      removeWorker(_, <span class="string">"Not responding for recovery"</span>))</span><br><span class="line"></span><br><span class="line">    <span class="comment">// remove applications which were not claimed by any workers</span></span><br><span class="line">    apps.filter(_.state == <span class="type">ApplicationState</span>.<span class="type">UNKNOWN</span>).foreach &#123; a =&gt;</span><br><span class="line">      logWarning(<span class="string">s"Application <span class="subst">$&#123;a.id&#125;</span> was not found after master recovery"</span>)</span><br><span class="line">      removeApplication(a.id, <span class="type">ApplicationState</span>.<span class="type">ERROR</span>, <span class="type">None</span>,</span><br><span class="line">          <span class="type">Some</span>(<span class="string">s"Application <span class="subst">$&#123;a.id&#125;</span> was not found after master recovery"</span>))</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    state = <span class="type">RecoveryState</span>.<span class="type">ALIVE</span></span><br><span class="line">    schedule()</span><br><span class="line">    logInfo(<span class="string">"Recovery complete - resuming operations!"</span>)</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Spark/" rel="tag"># Spark</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2019/07/15/Spark 内存管理/" rel="prev" title="Spark 内存管理">
+      <i class="fa fa-chevron-left"></i> Spark 内存管理
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2019/08/01/Spark Standlone 模式理解/" rel="next" title="Spark Standlone 模式">
+      Spark Standlone 模式 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Spark-standlone-master-HA-原理分析"><span class="nav-number">1.</span> <span class="nav-text">Spark standlone master HA 原理分析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#高可用基本原理"><span class="nav-number">1.1.</span> <span class="nav-text">高可用基本原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#高可用代码分析"><span class="nav-number">1.2.</span> <span class="nav-text">高可用代码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#active-master-选举分析"><span class="nav-number">1.2.1.</span> <span class="nav-text">active master 选举分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#active-master-恢复分析"><span class="nav-number">1.2.2.</span> <span class="nav-text">active master 恢复分析</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Yujie</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">43</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">12</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">20</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Yujie</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+<script src="/js/utils.js"></script><script src="/js/motion.js"></script>
+<script src="/js/schemes/muse.js"></script>
+<script src="/js/next-boot.js"></script>
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

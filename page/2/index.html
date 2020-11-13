@@ -160,6 +160,181 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/08/01/Spark Standlone 模式理解/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2019/08/01/Spark Standlone 模式理解/" class="post-title-link" itemprop="url">Spark Standlone 模式</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2019-08-01 16:49:01" itemprop="dateCreated datePublished" datetime="2019-08-01T16:49:01+08:00">2019-08-01</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/BigData/" itemprop="url" rel="index"><span itemprop="name">BigData</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="Spark-Standlone-模式浅析"><a href="#Spark-Standlone-模式浅析" class="headerlink" title="Spark Standlone 模式浅析"></a>Spark Standlone 模式浅析</h1><p>Spark提供了一种叫做独立部署模式(standlone模式)，通过简单配置就可以非常轻松地部署一个Spark大数据集群。相比Mesos/YARN调度器，Spark自带的standlone模式开箱即用、简单粗暴。但是如果想要更加精细的控制集群使用情况，那么还是需要用Yarn/Mesos。</p>
+<p>standone模式下，集群机器划分为master机器/worker机器，master机器主要负责集群任务调度，worker机器则负责任务运行。standlone模式支持多种部署方式，例如单机部署、高可用集群部署。</p>
+<h2 id="集群部署"><a href="#集群部署" class="headerlink" title="集群部署"></a>集群部署</h2><p>首先，集群中每台机器都需要由官网下载已经编译好了的spark包，都固定存放在某个目录下。当集群中master和worker都启动后，可以在master web ui界面上看到worker列表(CPU/MEM)</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span> master节点启动</span><br><span class="line">./sbin/start-master.sh</span><br><span class="line"></span><br><span class="line"><span class="meta">#</span> worker节点启动</span><br><span class="line">./sbin/start-slave.sh &lt;master-spark-URL&gt;</span><br></pre></td></tr></table></figure>
+<h2 id="任务提交"><a href="#任务提交" class="headerlink" title="任务提交"></a>任务提交</h2><p>为了简单的运行 Spark 的应用程序，只需要通过 <a href="http://spark.apache.org/docs/latest/programming-guide.html#initializing-spark" target="_blank" rel="noopener">SparkContext Constructor</a> spark://IP:PORT 这个 URL 。</p>
+<p>集群的交互式运行可以通过 Spark shell，运行下面命名:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./bin/spark-shell --master spark://IP:PORT</span><br></pre></td></tr></table></figure>
+<p>你也可以通过选项 –total-executor-cores 传递参数去控制 spark-shell 的核数</p>
+<p><a href="https://tangpengcsu.github.io/2016/12/24/spark-submitting-applications/" target="_blank" rel="noopener">spark-submit</a> 脚本提供了最直接的方式将一个 Spark 应用程序提交到集群。对于独立部署的集群，Spark 目前支持两种部署模式。在 client 模式中，driver 与客户端提交应用程序运行在同一个进程中。然而，在 cluster 模式中，driver 在集群的某个 worker 进程中启动，一旦客户端进程完成了已提交任务，它就会立即退出，并不会等到应用程序完成后再退出。</p>
+<p>如果你的应用程序通过 Spark submit 启动，你的应用程序 jar 包将会自动分发到所有的 worker 节点。对于你的应用程序依赖的其它 jar 包，你应该用 –jars 符号指定（如 –jars jar1,jar2）。 更多配置详见 <a href="http://spark.apache.org/docs/latest/configuration.html" target="_blank" rel="noopener">Spark Configuration</a>.</p>
+<p>另外，如果你的应用程序以非 0 (non-zero) 状态退出，独立集群模式支持重启程序。<strong>要支持自动重启，需要向 spark-submit 传递 –supervise 标志</strong>。如果你想杀掉一个重复失败的应用程序，你可以使用如下方式：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./bin/spark-class org.apache.spark.deploy.Client kill &lt;master url&gt; &lt;driver ID&gt;</span><br></pre></td></tr></table></figure>
+<p>你可以在 Master 的 web UI 上 <a href="http://localhost:8080" target="_blank" rel="noopener">http://localhost:8080</a> 找到 driver ID。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2019/08/01/Spark Standlone 模式理解/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/08/01/Spark Standlon HA 深入分析/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2019/08/01/Spark Standlon HA 深入分析/" class="post-title-link" itemprop="url">Spark Standlone HA 原理分析</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2019-08-01 14:29:01" itemprop="dateCreated datePublished" datetime="2019-08-01T14:29:01+08:00">2019-08-01</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2020-11-13 22:03:00" itemprop="dateModified" datetime="2020-11-13T22:03:00+08:00">2020-11-13</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/BigData/" itemprop="url" rel="index"><span itemprop="name">BigData</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="Spark-standlone-master-HA-原理分析"><a href="#Spark-standlone-master-HA-原理分析" class="headerlink" title="Spark standlone master HA 原理分析"></a>Spark standlone master HA 原理分析</h1><p>spark standlone 高可用集群架构大概如下，集群中启动多个master节点，其中只有一个master是active，其余master为backup。当集群中active master crash的时候，standby master通过zookeeper会选举出新的active机器，集群恢复工作。在这个集群恢复的工程中，已经提交的spark任务不受影响，standby master在被选举为active master大概需要1~2分钟，这期间master将无法提交新的任务。</p>
+<p>spark standlone master HA集群架构大体如下：</p>
+<p><img src="../images/spark_standlone_overview.jpg" alt="logbeat"></p>
+<p>Spark采用<a href="https://curator.apache.org/" target="_blank" rel="noopener">apache curator</a>连接zookeeper进行active master选举，zookeeper提供API比较底层操作的是数据结构和节点的状态，<a href="https://curator.apache.org/" target="_blank" rel="noopener">apache curator</a>进行了一层封装，提供了比较高阶的API。</p>
+<h2 id="高可用基本原理"><a href="#高可用基本原理" class="headerlink" title="高可用基本原理"></a>高可用基本原理</h2><p>Spark master 高可用的基本原理是使用了Zookeeper进行了active选举，简单的说是使用了zookeeper作为实现leader选举，多台master机器在启动进行leader选举，如果选举成功则成为active master，并把自己的IP信息写到zookeeper节点中，其余未选举成功的的master失败成为standby master。standby master并且会在zookeeper上watch节点的变化，如果节点状态变化，意味着active master存在异常，那么则会触发新一轮active master选举。</p>
+<p>在Zookeeper上创建的临时节点来实现leader election，如果应用程序和zookeeper之间Session超时，会导致zookeeper删除临时节点，此时也会触发leader election。在生产环境下，如果采用Java写的应用程序负载高，Full GC此时有可能会导致应用程序和Zookeeper Session超时。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[_c_aa37b1e8-3feb-49ec-9ab7-7c97038e4747-latch-0000000000, _c_b7fa02ab-e344-41cf-b2e0-29afaddd469d-latch-0000000001]</span><br></pre></td></tr></table></figure>
+<p>Spark默认把zookeeper选举节点存放在<code>/spark/leader_election</code>路径上，zk节点类型是<code>ephemeral节点</code>，节点名称前部分是一个UUID，后面部分是一个序列号，通常来说序号小的是<code>leader</code></p>
+<p>Spark standlone 模式下在提交应用程序或者集群添加节点时，会把应用程序以及节点信息持久化到Zookeeper节点中。<code>active master</code>选举成功后，会从zookeeper节点中读取应用程序列表和worker节点列表，并开始进入<code>RECOVERING</code>状态；如果zookeeper节点汇总应用程序列表和worker节点列表都为空，直接进入<code>ALIVE</code>状态</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2019/08/01/Spark Standlon HA 深入分析/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
     <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/07/15/Spark 内存管理/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -920,193 +1095,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/02/14/kafka高可用设计(下)/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Yujie">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="KnifeFly">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2019/02/14/kafka高可用设计(下)/" class="post-title-link" itemprop="url">kafka高可用设计(下)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2019-02-14 23:01:22" itemprop="dateCreated datePublished" datetime="2019-02-14T23:01:22+08:00">2019-02-14</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2020-08-03 23:12:30" itemprop="dateModified" datetime="2020-08-03T23:12:30+08:00">2020-08-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/BigData/" itemprop="url" rel="index"><span itemprop="name">BigData</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>本文转发自<a href="http://www.jasongj.com/" target="_blank" rel="noopener"><strong>技术世界</strong></a>，<a href="http://www.jasongj.com/2015/06/08/KafkaColumn3" target="_blank" rel="noopener">原文链接</a>　<a href="http://www.jasongj.com/2015/06/08/KafkaColumn3" target="_blank" rel="noopener">http://www.jasongj.com/2015/06/08/KafkaColumn3</a></p>
-<p>本文在上篇文章 基础上，更加深入讲解了Kafka的HA机制，主要阐述了HA相关各种场景，如Broker failover，Controller failover，Topic创建/删除，Broker启动，Follower从Leader fetch数据等详细处理过程。同时介绍了Kafka提供的与Replication相关的工具，如重新分配Partition等。</p>
-<h1 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h1><p>　　本文在上篇文章基础上，更加深入讲解了Kafka的HA机制，主要阐述了HA相关各种场景，如Broker failover，Controller failover，Topic创建/删除，Broker启动，Follower从Leader fetch数据等详细处理过程。同时介绍了Kafka提供的与Replication相关的工具，如重新分配Partition等。</p>
-<h1 id="Broker-Failover过程"><a href="#Broker-Failover过程" class="headerlink" title="Broker Failover过程"></a>Broker Failover过程</h1><h2 id="Controller对Broker-failure的处理过程"><a href="#Controller对Broker-failure的处理过程" class="headerlink" title="Controller对Broker failure的处理过程"></a>Controller对Broker failure的处理过程</h2><ol>
-<li>Controller在Zookeeper的<code>/brokers/ids</code>节点上注册Watch。一旦有Broker宕机（本文用宕机代表任何让Kafka认为其Broker die的情景，包括但不限于机器断电，网络不可用，GC导致的Stop The World，进程crash等），其在Zookeeper对应的Znode会自动被删除，Zookeeper会fire Controller注册的Watch，Controller即可获取最新的幸存的Broker列表。</li>
-<li>Controller决定set_p，该集合包含了宕机的所有Broker上的所有Partition。</li>
-<li>对set_p中的每一个Partition：<br>　　3.1 从<code>/brokers/topics/[topic]/partitions/[partition]/state</code>读取该Partition当前的ISR。<br>　　3.2 决定该Partition的新Leader。如果当前ISR中有至少一个Replica还幸存，则选择其中一个作为新Leader，新的ISR则包含当前ISR中所有幸存的Replica。否则选择该Partition中任意一个幸存的Replica作为新的Leader以及ISR（该场景下可能会有潜在的数据丢失）。如果该Partition的所有Replica都宕机了，则将新的Leader设置为-1。<br>　　3.3 将新的Leader，ISR和新的<code>leader_epoch</code>及<code>controller_epoch</code>写入<code>/brokers/topics/[topic]/partitions/[partition]/state</code>。注意，该操作只有Controller版本在3.1至3.3的过程中无变化时才会执行，否则跳转到3.1。</li>
-<li>直接通过RPC向set_p相关的Broker发送LeaderAndISRRequest命令。Controller可以在一个RPC操作中发送多个命令从而提高效率。<br>　　Broker failover顺序图如下所示。<br><a href="http://www.jasongj.com/img/kafka/KafkaColumn2/kafka_broker_failover.png" target="_blank" rel="noopener"><img src="http://www.jasongj.com/img/kafka/KafkaColumn2/kafka_broker_failover.png" alt="broker failover sequence diagram "></a></li>
-</ol>
-<p>　　LeaderAndIsrRequest结构如下<br><a href="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrRequest.png" target="_blank" rel="noopener"><img src="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrRequest.png" alt="LeaderAndIsrRequest"></a></p>
-<p>　　LeaderAndIsrResponse结构如下<br><a href="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrResponse.png" target="_blank" rel="noopener"><img src="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrResponse.png" alt="LeaderAndIsrResponse"></a></p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2019/02/14/kafka高可用设计(下)/#more" rel="contents">
-                Read more &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/01/03/kafka运营-NotLeaderForPartitionException异常/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Yujie">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="KnifeFly">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2019/01/03/kafka运营-NotLeaderForPartitionException异常/" class="post-title-link" itemprop="url">Kafka运营-NotLeaderForPartitionException异常</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">Posted on</span>
-
-              <time title="Created: 2019-01-03 12:11:22" itemprop="dateCreated datePublished" datetime="2019-01-03T12:11:22+08:00">2019-01-03</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2020-08-03 23:12:30" itemprop="dateModified" datetime="2020-08-03T23:12:30+08:00">2020-08-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">In</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/BigData/" itemprop="url" rel="index"><span itemprop="name">BigData</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="Kafka-NotLeaderForPartitionException异常"><a href="#Kafka-NotLeaderForPartitionException异常" class="headerlink" title="Kafka NotLeaderForPartitionException异常"></a>Kafka NotLeaderForPartitionException异常</h2><h3 id="异常分析"><a href="#异常分析" class="headerlink" title="异常分析"></a>异常分析</h3><p>1.Kafka日志分析</p>
-<p>发现Kafka日志中有比较多的org.apache.kafka.common.errors.NotLeaderForPartitionException异常信息，该异常从字面解释就是某个分区的leader找不到，具体异常信息如下：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2019</span>-<span class="number">01</span>-<span class="number">18</span> <span class="number">22</span>:<span class="number">01</span>:<span class="number">00</span>,<span class="number">802</span> ERROR kafka.server.ReplicaFetcherThread: [ReplicaFetcherThread-<span class="number">0</span>-<span class="number">118</span>]: Error <span class="keyword">for</span> partition [kafka_custflow_topic_test,<span class="number">5</span>] to broker <span class="number">118</span>:org.apache.kafka.common.errors.NotLeaderForPartitionException: This server is not the leader <span class="keyword">for</span> that topic-partition.</span><br></pre></td></tr></table></figure>
-<p>通常来说该异常信息是由于kafka和zk连接存在超时，接着导致Controller重新选举导致获取元数据不正确，timed out的那台Broker所持有的partition就会出现NotLeaderForPartitionException，kafka中连接zk超时日志格式信息如下:</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">2019-01-18 21:59:55,916 WARN org.apache.zookeeper.ClientCnxn: Client session timed out, have not heard from server in 7329ms for sessionid 0x2677edb3ac1f8d5</span><br><span class="line">2019-01-18 21:59:55,916 INFO org.apache.zookeeper.ClientCnxn: Client session timed out, have not heard from server in 7329ms for sessionid 0x2677edb3ac1f8d5, closing socket connection and attempting reconnect</span><br></pre></td></tr></table></figure>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">2019-01-18 21:59:56,075 INFO org.apache.zookeeper.ClientCnxn: Opening socket connection to server mfsmaster/121.9.240.249:2181. Will not attempt to authenticate using SASL (unknown error)</span><br><span class="line">2019-01-18 21:59:56,075 INFO org.apache.zookeeper.ClientCnxn: Socket connection established to mfsmaster/121.9.240.249:2181, initiating session</span><br><span class="line">2019-01-18 21:59:56,080 WARN org.apache.zookeeper.ClientCnxn: Unable to reconnect to ZooKeeper service, session 0x2677edb3ac1f8d5 has expired</span><br><span class="line">2019-01-18 21:59:56,080 INFO org.I0Itec.zkclient.ZkClient: zookeeper state changed (Expired)</span><br><span class="line">2019-01-18 21:59:56,080 INFO org.apache.zookeeper.ClientCnxn: Unable to reconnect to ZooKeeper service, session 0x2677edb3ac1f8d5 has expired, closing socket connection</span><br><span class="line">2019-01-18 21:59:56,080 INFO org.apache.zookeeper.ZooKeeper: Initiating client connection, connectString=SR-CNSX-GDFS-240-251:2181,SR-CNSX-GDFS-240-252:2181,SR-CNSX-GDFS-240-253:2181,mfslogger:2181,mfsmaster:2181/kafka sessionTimeout=6000 watcher=org.I0Itec.zkclient.ZkClient@7957dc72</span><br><span class="line">2019-01-18 21:59:56,080 INFO org.apache.zookeeper.ClientCnxn: EventThread shut down for session: 0x2677edb3ac1f8d5</span><br></pre></td></tr></table></figure>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">2019-01-18 21:59:56,094 INFO org.I0Itec.zkclient.ZkClient: zookeeper state changed (SyncConnected)</span><br><span class="line">2019-01-18 21:59:56,095 INFO kafka.server.KafkaHealthcheck$SessionExpireListener: re-registering broker info in ZK for broker 121</span><br><span class="line">2019-01-18 21:59:56,095 INFO kafka.utils.ZKCheckedEphemeral: Creating /brokers/ids/121 (is it secure? false)</span><br><span class="line">2019-01-18 21:59:56,112 INFO kafka.utils.ZKCheckedEphemeral: Result of znode creation is: OK</span><br><span class="line">2019-01-18 21:59:56,113 INFO kafka.utils.ZkUtils: Registered broker 121 at path /brokers/ids/121 with addresses: EndPoint(SR-CNSX-GDFS-240-252,9092,ListenerName(PLAINTEXT),PLAINTEXT)</span><br><span class="line">2019-01-18 21:59:56,113 INFO kafka.server.KafkaHealthcheck$SessionExpireListener: done re-registering broker</span><br><span class="line">2019-01-18 21:59:56,113 INFO kafka.server.KafkaHealthcheck$SessionExpireListener: Subscribing to /brokers/topics path to watch for new topics</span><br></pre></td></tr></table></figure>
-<p>2.zk日志分析</p>
-<p>同时分析zk日志信息：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">2019-01-18 21:59:55,961 WARN org.apache.zookeeper.server.NIOServerCnxn: caught end of stream exception</span><br><span class="line">EndOfStreamException: Unable to read additional data from client sessionid 0x2677edb3ac1f8d5, likely client has closed socket</span><br><span class="line">        at org.apache.zookeeper.server.NIOServerCnxn.doIO(NIOServerCnxn.java:231)</span><br><span class="line">        at org.apache.zookeeper.server.NIOServerCnxnFactory.run(NIOServerCnxnFactory.java:208)</span><br><span class="line">        at java.lang.Thread.run(Thread.java:748)</span><br><span class="line">2019-01-18 21:59:55,962 INFO org.apache.zookeeper.server.NIOServerCnxn: Closed socket connection for client /121.9.240.252:40660 which had sessionid 0x2677edb3ac1f8d5</span><br><span class="line">2019-01-18 21:59:56,001 INFO org.apache.zookeeper.server.ZooKeeperServer: Expiring session 0x2677edb3ac1f8d5, timeout of 6000ms exceeded</span><br><span class="line">2019-01-18 21:59:56,001 INFO org.apache.zookeeper.server.PrepRequestProcessor: Processed session termination for sessionid: 0x2677edb3ac1f8d5</span><br></pre></td></tr></table></figure>
-<p>综合zk和kafka日志信息，可以看出kafka和zk session超时之后，session会被zk主动关闭，之后kafka会重新连接到zk集群，基本是在1s之内kafka新的session已经建立，所以从短时间内kafka服务没问题。</p>
-<p>3.gc日志分析</p>
-<p>Gc 日志中基本没有Full GC</p>
-<p>4.系统资源分析</p>
-<ul>
-<li>晚上9~10业务晚高峰，数据量通常比较大</li>
-<li>CPU 内存正常</li>
-<li>IO在晚高峰时存在突刺</li>
-</ul>
-<h3 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h3><p>1.kafka增大session time out </p>
-<p>当前默认值是6s，可适当加大超时时间</p>
-<p>2.增加kafka磁盘</p>
-<p>3.增加磁盘IO处理线程数</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1176,7 +1164,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">41</span>
+          <span class="site-state-item-count">43</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -1189,7 +1177,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-count">20</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>

@@ -160,6 +160,196 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2016/01/15/sock5协议原理分析/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2016/01/15/sock5协议原理分析/" class="post-title-link" itemprop="url">sock5协议原理分析</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2016-01-15 22:47:03" itemprop="dateCreated datePublished" datetime="2016-01-15T22:47:03+08:00">2016-01-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2020-08-03 23:14:04" itemprop="dateModified" datetime="2020-08-03T23:14:04+08:00">2020-08-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/net/" itemprop="url" rel="index"><span itemprop="name">net</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>早点两年前就开始使用shadowsocks了,那时候买了搬瓦工一年19$的vps,由于搬瓦工数据中心比较少,且大部分位于美国,经过测试选了个在凤凰城的机房,但是网速一直不稳定时不时的断线,前阵子买了vultr位于东京数据中心的vps,网络稳定,看youtube 1080p 毫无压力.虽然用了很久的shandowsock5,但是一直对sock5协知之甚少,决定解下这个牛逼的翻墙协议,简单的说就是在墙外搭一个sock5服务器,墙内的客户端把tcp数据加密后发往墙外的服务器,server按照sock5协议解密后再发往目标机器</p>
+<div style="align: center"><br><img src="https://yuerblog.cc/wp-content/uploads/2016/11/WechatIMG938.jpeg" width="100%" height="100%"><br></div>
+
+<ol>
+<li>PC客户端（即你的电脑）发出请求基于Socks5协议跟SS-Local端进行通讯，由于这个SS-Local一般是本机或路由器等局域网的其他机器，不经过GFW，所以解决GFW通过特征分析进行干扰的问题</li>
+<li>SS-Local和SS-Server两端通过多种可选的加密方法(“aes-256-cfb”等)进行通讯，经过GFW的时候因为是常规的TCP包，没有明显特征码GFW也无法对通讯数据进行解密</li>
+<li>SS-Server将收到的加密数据进行解密，还原初始请求，再发送到用户需要访问的服务网站，获取响应原路再返回SS-04，返回途中依然使用了加密，使得流量是普通TCP包，并成功穿过GFW防火墙</li>
+</ol>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2016/01/15/sock5协议原理分析/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2016/01/15/linux-守护进程/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2016/01/15/linux-守护进程/" class="post-title-link" itemprop="url">linux 守护进程</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2016-01-15 12:11:22" itemprop="dateCreated datePublished" datetime="2016-01-15T12:11:22+08:00">2016-01-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2020-08-03 23:13:47" itemprop="dateModified" datetime="2020-08-03T23:13:47+08:00">2020-08-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/linux/" itemprop="url" rel="index"><span itemprop="name">linux</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="守护进程"><a href="#守护进程" class="headerlink" title="守护进程"></a>守护进程</h1><p>linux 服务端程序很多都是以守护进程的方式对外提供服务, linux 系统本身也有很多守护进程,例如kthreadd用来创建内核进程, kswapd是内存换页守护进程,flush是dump内存中的脏页面到磁盘,jbd提供ext4文件系统的日志日志功能…守护进程命名大部分都是以d结尾. 大部分守护进程都是以root方式运行,没有控制终端,运行在后台. 大部分守护进程都是进程组的组长进程以及会话的首进程,而且是进程组和会话中的唯一进程. 守护进程的父进程一般是系统1号进程,例如initd或者systemd.</p>
+<h1 id="编程规则"><a href="#编程规则" class="headerlink" title="编程规则"></a>编程规则</h1><p>为了让守护进程在后台运行,减少不必要的交互,守护进程的编写有一套编程规则:</p>
+<ul>
+<li>umask将文件模式创建屏蔽字设置一个已知值,通常是0. 由于继承得来的文件模式屏蔽字可能会被设置为拒绝某些权限.</li>
+<li>fork() 然后父进程exit<ul>
+<li>如果守护进程是以shell命令启动, 父进程exit会让shell认为这条命令已经执行完毕</li>
+<li>虽然子进程继承了父进程的进程组ID, 但获得了一个新的进程ID,这保证了子进程不是一个进程组的组长进程  (setid调用的条件)</li>
+</ul>
+</li>
+<li>调用setid创建一个新会话, 如果调用setsid的进程不是一个进程组的组长，此函数创建一个新的会话期setid,setid会让子进程执行三个步骤<ul>
+<li>让子进程成为新会话的首进程</li>
+<li>让子进程成为新进程组的组长进程</li>
+<li>让子进程没有控制终端,如果在调用setsid前，该进程有控制终端，那么与该终端的联系被解除。 如果该进程是一个进程组的组长，此函数返回错误</li>
+<li>为了保证这一点，我们先调用fork()然后exit()，此时只有子进程在运行</li>
+</ul>
+</li>
+<li>再次fork, 这个步骤有些守护进程没有. 此时进程已经成为无终端的会话组长,但它可以重新申请打开一个控制终端,为了使进程不再成为会话组长来禁止进程重新打开控制终端, 再次fork然后父进程exit</li>
+<li>设置工作目录为根目录, 从父进程继承过来的当前工作目录可能在一个挂载的文件系统中</li>
+<li>关闭不再需要的文件描述符</li>
+<li>打开/dev/null, 让文件描述符0 1 2都指向/dev/null</li>
+<li>处理SIGCHLD信号, 处理SIGCHLD信号并不是必须的</li>
+</ul>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2016/01/15/linux-守护进程/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
     <link itemprop="mainEntityOfPage" href="http://yoursite.com/2016/01/12/linux中最大文件描述符数/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -346,7 +536,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">41</span>
+          <span class="site-state-item-count">43</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -359,7 +549,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">19</span>
+        <span class="site-state-item-count">20</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>

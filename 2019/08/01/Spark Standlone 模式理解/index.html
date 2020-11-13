@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 3.7.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="Spark Standlone 模式浅析Spark提供了一种叫做独立部署模式(standlone模式)，通过简单配置就可以非常轻松地部署一个Spark大数据集群。相比Mesos/YARN调度器，Spark自带的standlone模式开箱即用、简单粗暴。但是如果想要更加精细的控制集群使用情况，那么还是需要用Yarn/Mesos。 standone模式下，集群机器划分为master机器/worker机">
+<meta name="keywords" content="Spark">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Spark Standlone 模式">
+<meta property="og:url" content="http://yoursite.com/2019/08/01/Spark Standlone 模式理解/index.html">
+<meta property="og:site_name" content="KnifeFly">
+<meta property="og:description" content="Spark Standlone 模式浅析Spark提供了一种叫做独立部署模式(standlone模式)，通过简单配置就可以非常轻松地部署一个Spark大数据集群。相比Mesos/YARN调度器，Spark自带的standlone模式开箱即用、简单粗暴。但是如果想要更加精细的控制集群使用情况，那么还是需要用Yarn/Mesos。 standone模式下，集群机器划分为master机器/worker机">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-08-01T08:49:01.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Spark Standlone 模式">
+<meta name="twitter:description" content="Spark Standlone 模式浅析Spark提供了一种叫做独立部署模式(standlone模式)，通过简单配置就可以非常轻松地部署一个Spark大数据集群。相比Mesos/YARN调度器，Spark自带的standlone模式开箱即用、简单粗暴。但是如果想要更加精细的控制集群使用情况，那么还是需要用Yarn/Mesos。 standone模式下，集群机器划分为master机器/worker机">
+
+<link rel="canonical" href="http://yoursite.com/2019/08/01/Spark Standlone 模式理解/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>Spark Standlone 模式 | KnifeFly</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">KnifeFly</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/08/01/Spark Standlone 模式理解/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Spark Standlone 模式
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2019-08-01 16:49:01" itemprop="dateCreated datePublished" datetime="2019-08-01T16:49:01+08:00">2019-08-01</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">In</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/BigData/" itemprop="url" rel="index"><span itemprop="name">BigData</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="Spark-Standlone-模式浅析"><a href="#Spark-Standlone-模式浅析" class="headerlink" title="Spark Standlone 模式浅析"></a>Spark Standlone 模式浅析</h1><p>Spark提供了一种叫做独立部署模式(standlone模式)，通过简单配置就可以非常轻松地部署一个Spark大数据集群。相比Mesos/YARN调度器，Spark自带的standlone模式开箱即用、简单粗暴。但是如果想要更加精细的控制集群使用情况，那么还是需要用Yarn/Mesos。</p>
+<p>standone模式下，集群机器划分为master机器/worker机器，master机器主要负责集群任务调度，worker机器则负责任务运行。standlone模式支持多种部署方式，例如单机部署、高可用集群部署。</p>
+<h2 id="集群部署"><a href="#集群部署" class="headerlink" title="集群部署"></a>集群部署</h2><p>首先，集群中每台机器都需要由官网下载已经编译好了的spark包，都固定存放在某个目录下。当集群中master和worker都启动后，可以在master web ui界面上看到worker列表(CPU/MEM)</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span> master节点启动</span><br><span class="line">./sbin/start-master.sh</span><br><span class="line"></span><br><span class="line"><span class="meta">#</span> worker节点启动</span><br><span class="line">./sbin/start-slave.sh &lt;master-spark-URL&gt;</span><br></pre></td></tr></table></figure>
+<h2 id="任务提交"><a href="#任务提交" class="headerlink" title="任务提交"></a>任务提交</h2><p>为了简单的运行 Spark 的应用程序，只需要通过 <a href="http://spark.apache.org/docs/latest/programming-guide.html#initializing-spark" target="_blank" rel="noopener">SparkContext Constructor</a> spark://IP:PORT 这个 URL 。</p>
+<p>集群的交互式运行可以通过 Spark shell，运行下面命名:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./bin/spark-shell --master spark://IP:PORT</span><br></pre></td></tr></table></figure>
+<p>你也可以通过选项 –total-executor-cores 传递参数去控制 spark-shell 的核数</p>
+<p><a href="https://tangpengcsu.github.io/2016/12/24/spark-submitting-applications/" target="_blank" rel="noopener">spark-submit</a> 脚本提供了最直接的方式将一个 Spark 应用程序提交到集群。对于独立部署的集群，Spark 目前支持两种部署模式。在 client 模式中，driver 与客户端提交应用程序运行在同一个进程中。然而，在 cluster 模式中，driver 在集群的某个 worker 进程中启动，一旦客户端进程完成了已提交任务，它就会立即退出，并不会等到应用程序完成后再退出。</p>
+<p>如果你的应用程序通过 Spark submit 启动，你的应用程序 jar 包将会自动分发到所有的 worker 节点。对于你的应用程序依赖的其它 jar 包，你应该用 –jars 符号指定（如 –jars jar1,jar2）。 更多配置详见 <a href="http://spark.apache.org/docs/latest/configuration.html" target="_blank" rel="noopener">Spark Configuration</a>.</p>
+<p>另外，如果你的应用程序以非 0 (non-zero) 状态退出，独立集群模式支持重启程序。<strong>要支持自动重启，需要向 spark-submit 传递 –supervise 标志</strong>。如果你想杀掉一个重复失败的应用程序，你可以使用如下方式：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./bin/spark-class org.apache.spark.deploy.Client kill &lt;master url&gt; &lt;driver ID&gt;</span><br></pre></td></tr></table></figure>
+<p>你可以在 Master 的 web UI 上 <a href="http://localhost:8080" target="_blank" rel="noopener">http://localhost:8080</a> 找到 driver ID。</p>
+<a id="more"></a>
+<h2 id="资源调度"><a href="#资源调度" class="headerlink" title="资源调度"></a>资源调度</h2><p>独立部署的集群模式仅仅支持简单的<code>FIFO 调度器</code>。然而，为了允许多个并行的用户，你能够控制<code>每个应用程序能用的最大资源数</code>。在默认情况下，它将获得集群的所有核，这只有在某一时刻只允许一个应用程序才有意义。你可以通过 spark.cores.max 在 <a href="http://spark.apache.org/docs/latest/configuration.html#spark-properties" target="_blank" rel="noopener">SparkConf</a> 中设置核数。</p>
+<figure class="highlight scala"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">val</span> conf = <span class="keyword">new</span> <span class="type">SparkConf</span>()</span><br><span class="line">             .setMaster(...)</span><br><span class="line">             .setAppName(...)</span><br><span class="line">             .set(<span class="string">"spark.cores.max"</span>, <span class="string">"10"</span>)</span><br><span class="line"><span class="keyword">val</span> sc = <span class="keyword">new</span> <span class="type">SparkContext</span>(conf)</span><br></pre></td></tr></table></figure>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">export SPARK_MASTER_OPTS="-Dspark.deploy.defaultCores=&lt;value&gt;"</span><br></pre></td></tr></table></figure>
+<h2 id="监控和日志"><a href="#监控和日志" class="headerlink" title="监控和日志"></a>监控和日志</h2><p>Spark 的standlone模式提供了一个基于 Web 的用户界面来监控集群。Master 和 每个 Worker 都有自己的 web 用户界面，显示集群和作业统计信息。默认情况下你可以在 8080 端口访问 Web UI 的主端口也可以在配置文件中或通过命令行选项进行更改。</p>
+<p>此外，对于每个作业详细的日志也会输出每个 worker 目录下（默认情况工作目录 SPARK_HOME/work）。你会看到两个文件为每个作业，stdout 并 stderr 与所有输出它写信给其控制台。</p>
+<h2 id="集群高可用"><a href="#集群高可用" class="headerlink" title="集群高可用"></a>集群高可用</h2><p>默认情况下，独立的调度集群对 worker 失败是有弹性的（在 Spark 本身的范围内是有弹性的，对失败的工作通过它自动调度到另外的 worker 来解决）。然而，调度器通过 master 去执行调度决定， 这会造成单点故障：如果 master 死了，新的应用程序就无法创建。为了避免这个，我们有两个高可用的模式。</p>
+<p>(1) zookeeper</p>
+<p>利用 ZooKeeper 去支持 leader 选举以及一些状态存储，你能够在你的集群中<code>启动多个 master</code>，<strong>这些 master 连接到同一个 ZooKeeper 实例上，一个被选为 <code>leader</code> ，其它的为<code>backup</code>。如果当前的 leader 死了，另一个 master 将会被选中，恢复老 master 的状态，然后恢复调度。整个的恢复过程大概需要 1 到 2 分钟。注意，这个恢复时间仅仅会影响调度新的应用程序——运行在失败 master 中的 应用程序将不受影响</strong>。</p>
+<p>为了开启这个恢复模式，你可以用下面的属性在 spark-env 中设置 SPARK_DAEMON_JAVA_OPTS spark.deploy.recoveryMode 及相关 spark.deploy.zookeeper.* 的配置。有关这些配置的详细信息，请参阅 <a href="https://tangpengcsu.github.io/2016/12/24/spark-configuration/#section-4" target="_blank" rel="noopener">配置文档</a></p>
+<p>为了调度新的应用程序或者添加 worker 到集群，它需要知道当前 leader 的 IP 地址。这可以通过简单的传递一个 master 列表来完成。例如，你可能启动你的 SparkContext 指向 spark://host1:port1,host2:port2。 这将造成你的 SparkContext 同时注册这两个 master – 如果 host1 死了，这个配置文件将一直是正确的，因为我们将找到新的 leader-host2。</p>
+<p>(2) local filesystem</p>
+<p>在生产环境下，使用zookeeper使得master具备高可用是最优的选择，但是在测试环境下，如果只是想要master在异常之后重启master以恢复运行，那么使用本地文件系统来做单点恢复也是可以的。</p>
+<ul>
+<li>这个解决方案可以和监控器 / 管理器（如 <a href="https://mmonit.com/monit/" target="_blank" rel="noopener">monit</a>）相配合，或者仅仅通过重启开启手动恢复。</li>
+<li>虽然文件系统的恢复似乎比没有做任何恢复要好，但对于特定的开发或实验目的，这种模式可能是次优的。特别是，通过 stop-master.sh 杀掉 master 不会清除它的恢复状态，所以，不管你何时启动一个新的 master，它都将进入恢复模式。这可能使启动时间增加到 1 分钟。</li>
+<li>虽然它不是官方支持的方式，你也可以创建一个NFS目录作为恢复目录。如果原始的 master节点完全死掉，你可以在不同的节点启动 master，它可以正确的恢复之前注册的所有应用程序和 workers。未来的应用程序会发现这个新的 master。</li>
+</ul>
+<h2 id="配置项说明"><a href="#配置项说明" class="headerlink" title="配置项说明"></a>配置项说明</h2><p>master和worker配置项说明:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Argument</th>
+<th style="text-align:left">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>-h HOST</code>, <code>--host HOST</code></td>
+<td style="text-align:left">Hostname to listen on</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>-i HOST</code>, <code>--ip HOST</code></td>
+<td style="text-align:left">Hostname to listen on (deprecated, use -h or –host)</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>-p PORT</code>, <code>--port PORT</code></td>
+<td style="text-align:left">Port for service to listen on (default: 7077 for master, random for worker)</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>--webui-port PORT</code></td>
+<td style="text-align:left">Port for web UI (default: 8080 for master, 8081 for worker)</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>-c CORES</code>, <code>--cores CORES</code></td>
+<td style="text-align:left">Total CPU cores to allow Spark applications to use on the machine (default: all available); only on worker</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>-m MEM</code>, <code>--memory MEM</code></td>
+<td style="text-align:left">Total amount of memory to allow Spark applications to use on the machine, in a format like 1000M or 2G (default: your machine’s total RAM minus 1 GiB); only on worker</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>-d DIR</code>, <code>--work-dir DIR</code></td>
+<td style="text-align:left">Directory to use for scratch space and job output logs (default: SPARK_HOME/work); only on worker</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>--properties-file FILE</code></td>
+<td style="text-align:left">Path to a custom Spark properties file to load (default: conf/spark-defaults.conf)</td>
+</tr>
+</tbody>
+</table>
+<p>master和worker环境变量说明:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Environment Variable</th>
+<th style="text-align:left">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>SPARK_MASTER_HOST</code></td>
+<td style="text-align:left">Bind the master to a specific hostname or IP address, for example a public one.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_MASTER_PORT</code></td>
+<td style="text-align:left">Start the master on a different port (default: 7077).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_MASTER_WEBUI_PORT</code></td>
+<td style="text-align:left">Port for the master web UI (default: 8080).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_MASTER_OPTS</code></td>
+<td style="text-align:left">Configuration properties that apply only to the master in the form “-Dx=y” (default: none). See below for a list of possible options.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_LOCAL_DIRS</code></td>
+<td style="text-align:left">Directory to use for “scratch” space in Spark, including map output files and RDDs that get stored on disk. This should be on a fast, local disk in your system. It can also be a comma-separated list of multiple directories on different disks.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_WORKER_CORES</code></td>
+<td style="text-align:left">Total number of cores to allow Spark applications to use on the machine (default: all available cores).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_WORKER_MEMORY</code></td>
+<td style="text-align:left">Total amount of memory to allow Spark applications to use on the machine, e.g. <code>1000m</code>, <code>2g</code> (default: total memory minus 1 GiB); note that each application’s <em>individual</em> memory is configured using its <code>spark.executor.memory</code> property.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_WORKER_PORT</code></td>
+<td style="text-align:left">Start the Spark worker on a specific port (default: random).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_WORKER_WEBUI_PORT</code></td>
+<td style="text-align:left">Port for the worker web UI (default: 8081).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_WORKER_DIR</code></td>
+<td style="text-align:left">Directory to run applications in, which will include both logs and scratch space (default: SPARK_HOME/work).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_WORKER_OPTS</code></td>
+<td style="text-align:left">Configuration properties that apply only to the worker in the form “-Dx=y” (default: none). See below for a list of possible options.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_DAEMON_MEMORY</code></td>
+<td style="text-align:left">Memory to allocate to the Spark master and worker daemons themselves (default: 1g).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_DAEMON_JAVA_OPTS</code></td>
+<td style="text-align:left">JVM options for the Spark master and worker daemons themselves in the form “-Dx=y” (default: none).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_DAEMON_CLASSPATH</code></td>
+<td style="text-align:left">Classpath for the Spark master and worker daemons themselves (default: none).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>SPARK_PUBLIC_DNS</code></td>
+<td style="text-align:left">The public DNS name of the Spark master and workers (default: none).</td>
+</tr>
+</tbody>
+</table>
+<p>spark master 配置项说明</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Property Name</th>
+<th style="text-align:left">Default</th>
+<th style="text-align:left">Meaning</th>
+<th style="text-align:left">Since Version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>spark.deploy.retainedApplications</code></td>
+<td style="text-align:left">200</td>
+<td style="text-align:left">The maximum number of completed applications to display. Older applications will be dropped from the UI to maintain this limit.</td>
+<td style="text-align:left">0.8.0</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.deploy.retainedDrivers</code></td>
+<td style="text-align:left">200</td>
+<td style="text-align:left">The maximum number of completed drivers to display. Older drivers will be dropped from the UI to maintain this limit.</td>
+<td style="text-align:left">1.1.0</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.deploy.spreadOut</code></td>
+<td style="text-align:left">true</td>
+<td style="text-align:left">Whether the standalone cluster manager should spread applications out across nodes or try to consolidate them onto as few nodes as possible. Spreading out is usually better for data locality in HDFS, but consolidating is more efficient for compute-intensive workloads.</td>
+<td style="text-align:left">0.6.1</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.deploy.defaultCores</code></td>
+<td style="text-align:left">(infinite)</td>
+<td style="text-align:left">Default number of cores to give to applications in Spark’s standalone mode if they don’t set <code>spark.cores.max</code>. If not set, applications always get all available cores unless they configure <code>spark.cores.max</code> themselves. Set this lower on a shared cluster to prevent users from grabbing the whole cluster by default.</td>
+<td style="text-align:left">0.9.0</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.deploy.maxExecutorRetries</code></td>
+<td style="text-align:left">10</td>
+<td style="text-align:left">Limit on the maximum number of back-to-back executor failures that can occur before the standalone cluster manager removes a faulty application. An application will never be removed if it has any running executors. If an application experiences more than <code>spark.deploy.maxExecutorRetries</code> failures in a row, no executors successfully start running in between those failures, and the application has no running executors then the standalone cluster manager will remove the application and mark it as failed. To disable this automatic removal, set <code>spark.deploy.maxExecutorRetries</code> to <code>-1</code>.</td>
+<td style="text-align:left">1.6.3</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.worker.timeout</code></td>
+<td style="text-align:left">60</td>
+<td style="text-align:left">Number of seconds after which the standalone deploy master considers a worker lost if it receives no heartbeats.</td>
+<td style="text-align:left">0.6.2</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.worker.resource.{resourceName}.amount</code></td>
+<td style="text-align:left">(none)</td>
+<td style="text-align:left">Amount of a particular resource to use on the worker.</td>
+<td style="text-align:left">3.0.0</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.worker.resource.{resourceName}.discoveryScript</code></td>
+<td style="text-align:left">(none)</td>
+<td style="text-align:left">Path to resource discovery script, which is used to find a particular resource while worker starting up. And the output of the script should be formatted like the <code>ResourceInformation</code> class.</td>
+<td style="text-align:left">3.0.0</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.worker.resourcesFile</code></td>
+<td style="text-align:left">(none)</td>
+<td style="text-align:left">Path to resources file which is used to find various resources while worker starting up. The content of resources file should be formatted like <code>[{&quot;id&quot;:{&quot;componentName&quot;: &quot;spark.worker&quot;,&quot;resourceName&quot;:&quot;gpu&quot;},&quot;addresses&quot;:[&quot;0&quot;,&quot;1&quot;,&quot;2&quot;]}]</code>. If a particular resource is not found in the resources file, the discovery script would be used to find that resource. If the discovery script also does not find the resources, the worker will fail to start up.</td>
+<td style="text-align:left">3.0.0</td>
+</tr>
+</tbody>
+</table>
+<p>spark worker 配置项说明</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Property Name</th>
+<th style="text-align:left">Default</th>
+<th style="text-align:left">Meaning</th>
+<th style="text-align:left">Since Version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>spark.worker.cleanup.enabled</code></td>
+<td style="text-align:left">false</td>
+<td style="text-align:left">Enable periodic cleanup of worker / application directories. Note that this only affects standalone mode, as YARN works differently. Only the directories of stopped applications are cleaned up. This should be enabled if spark.shuffle.service.db.enabled is “true”</td>
+<td style="text-align:left">1.0.0</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.worker.cleanup.interval</code></td>
+<td style="text-align:left">1800 (30 minutes)</td>
+<td style="text-align:left">Controls the interval, in seconds, at which the worker cleans up old application work dirs on the local machine.</td>
+<td style="text-align:left">1.0.0</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.worker.cleanup.appDataTtl</code></td>
+<td style="text-align:left">604800 (7 days, 7 <em> 24 </em> 3600)</td>
+<td style="text-align:left">The number of seconds to retain application work directories on each worker. This is a Time To Live and should depend on the amount of available disk space you have. Application logs and jars are downloaded to each application work dir. Over time, the work dirs can quickly fill up disk space, especially if you run jobs very frequently.</td>
+<td style="text-align:left">1.0.0</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.shuffle.service.db.enabled</code></td>
+<td style="text-align:left">true</td>
+<td style="text-align:left">Store External Shuffle service state on local disk so that when the external shuffle service is restarted, it will automatically reload info on current executors. This only affects standalone mode (yarn always has this behavior enabled). You should also enable <code>spark.worker.cleanup.enabled</code>, to ensure that the state eventually gets cleaned up. This config may be removed in the future.</td>
+<td style="text-align:left">3.0.0</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.storage.cleanupFilesAfterExecutorExit</code></td>
+<td style="text-align:left">true</td>
+<td style="text-align:left">Enable cleanup non-shuffle files(such as temp. shuffle blocks, cached RDD/broadcast blocks, spill files, etc) of worker directories following executor exits. Note that this doesn’t overlap with <code>spark.worker.cleanup.enabled</code>, as this enables cleanup of non-shuffle files in local directories of a dead executor, while <code>spark.worker.cleanup.enabled</code> enables cleanup of all files/subdirectories of a stopped and timeout application. This only affects Standalone mode, support of other cluster managers can be added in the future.</td>
+<td style="text-align:left">2.4.0</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>spark.worker.ui.compressedLogFileLengthCacheSize</code></td>
+<td style="text-align:left">100</td>
+<td style="text-align:left">For compressed log files, the uncompressed file can only be computed by uncompressing the files. Spark caches the uncompressed file size of compressed log files. This property controls the cache size.</td>
+<td style="text-align:left">2.0.2</td>
+</tr>
+</tbody>
+</table>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Spark/" rel="tag"># Spark</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2019/08/01/Spark Standlon HA 深入分析/" rel="prev" title="Spark Standlone HA 原理分析">
+      <i class="fa fa-chevron-left"></i> Spark Standlone HA 原理分析
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2019/08/24/ClickHouse运营总结/" rel="next" title="ClickHouse 运营总结">
+      ClickHouse 运营总结 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Spark-Standlone-模式浅析"><span class="nav-number">1.</span> <span class="nav-text">Spark Standlone 模式浅析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#集群部署"><span class="nav-number">1.1.</span> <span class="nav-text">集群部署</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#任务提交"><span class="nav-number">1.2.</span> <span class="nav-text">任务提交</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#资源调度"><span class="nav-number">1.3.</span> <span class="nav-text">资源调度</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#监控和日志"><span class="nav-number">1.4.</span> <span class="nav-text">监控和日志</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#集群高可用"><span class="nav-number">1.5.</span> <span class="nav-text">集群高可用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#配置项说明"><span class="nav-number">1.6.</span> <span class="nav-text">配置项说明</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Yujie</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">43</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">12</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">20</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Yujie</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+<script src="/js/utils.js"></script><script src="/js/motion.js"></script>
+<script src="/js/schemes/muse.js"></script>
+<script src="/js/next-boot.js"></script>
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
