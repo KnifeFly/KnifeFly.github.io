@@ -210,7 +210,7 @@
           <h1 id="Spark-Standlone-模式浅析"><a href="#Spark-Standlone-模式浅析" class="headerlink" title="Spark Standlone 模式浅析"></a>Spark Standlone 模式浅析</h1><p>Spark提供了一种叫做独立部署模式(standlone模式)，通过简单配置就可以非常轻松地部署一个Spark大数据集群。相比Mesos/YARN调度器，Spark自带的standlone模式开箱即用、简单粗暴。但是如果想要更加精细的控制集群使用情况，那么还是需要用Yarn/Mesos。</p>
 <p>standone模式下，集群机器划分为master机器/worker机器，master机器主要负责集群任务调度，worker机器则负责任务运行。standlone模式支持多种部署方式，例如单机部署、高可用集群部署。</p>
 <h2 id="集群部署"><a href="#集群部署" class="headerlink" title="集群部署"></a>集群部署</h2><p>首先，集群中每台机器都需要由官网下载已经编译好了的spark包，都固定存放在某个目录下。当集群中master和worker都启动后，可以在master web ui界面上看到worker列表(CPU/MEM)</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span> master节点启动</span><br><span class="line">./sbin/start-master.sh</span><br><span class="line"></span><br><span class="line"><span class="meta">#</span> worker节点启动</span><br><span class="line">./sbin/start-slave.sh &lt;master-spark-URL&gt;</span><br></pre></td></tr></table></figure>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> master节点启动</span></span><br><span class="line">./sbin/start-master.sh</span><br><span class="line"></span><br><span class="line"><span class="meta">#</span><span class="bash"> worker节点启动</span></span><br><span class="line">./sbin/start-slave.sh &lt;master-spark-URL&gt;</span><br></pre></td></tr></table></figure>
 <h2 id="任务提交"><a href="#任务提交" class="headerlink" title="任务提交"></a>任务提交</h2><p>为了简单的运行 Spark 的应用程序，只需要通过 <a href="http://spark.apache.org/docs/latest/programming-guide.html#initializing-spark" target="_blank" rel="noopener">SparkContext Constructor</a> spark://IP:PORT 这个 URL 。</p>
 <p>集群的交互式运行可以通过 Spark shell，运行下面命名:</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./bin/spark-shell --master spark://IP:PORT</span><br></pre></td></tr></table></figure>
@@ -277,7 +277,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">Edited on</span>
-                <time title="Modified: 2020-11-13 22:03:00" itemprop="dateModified" datetime="2020-11-13T22:03:00+08:00">2020-11-13</time>
+                <time title="Modified: 2020-11-13 22:24:27" itemprop="dateModified" datetime="2020-11-13T22:24:27+08:00">2020-11-13</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -302,7 +302,7 @@
       
           <h1 id="Spark-standlone-master-HA-原理分析"><a href="#Spark-standlone-master-HA-原理分析" class="headerlink" title="Spark standlone master HA 原理分析"></a>Spark standlone master HA 原理分析</h1><p>spark standlone 高可用集群架构大概如下，集群中启动多个master节点，其中只有一个master是active，其余master为backup。当集群中active master crash的时候，standby master通过zookeeper会选举出新的active机器，集群恢复工作。在这个集群恢复的工程中，已经提交的spark任务不受影响，standby master在被选举为active master大概需要1~2分钟，这期间master将无法提交新的任务。</p>
 <p>spark standlone master HA集群架构大体如下：</p>
-<p><img src="../images/spark_standlone_overview.jpg" alt="logbeat"></p>
+<p><img src="/images/spark_standlone_overview.jpg" alt="spark_standlone_overview"></p>
 <p>Spark采用<a href="https://curator.apache.org/" target="_blank" rel="noopener">apache curator</a>连接zookeeper进行active master选举，zookeeper提供API比较底层操作的是数据结构和节点的状态，<a href="https://curator.apache.org/" target="_blank" rel="noopener">apache curator</a>进行了一层封装，提供了比较高阶的API。</p>
 <h2 id="高可用基本原理"><a href="#高可用基本原理" class="headerlink" title="高可用基本原理"></a>高可用基本原理</h2><p>Spark master 高可用的基本原理是使用了Zookeeper进行了active选举，简单的说是使用了zookeeper作为实现leader选举，多台master机器在启动进行leader选举，如果选举成功则成为active master，并把自己的IP信息写到zookeeper节点中，其余未选举成功的的master失败成为standby master。standby master并且会在zookeeper上watch节点的变化，如果节点状态变化，意味着active master存在异常，那么则会触发新一轮active master选举。</p>
 <p>在Zookeeper上创建的临时节点来实现leader election，如果应用程序和zookeeper之间Session超时，会导致zookeeper删除临时节点，此时也会触发leader election。在生产环境下，如果采用Java写的应用程序负载高，Full GC此时有可能会导致应用程序和Zookeeper Session超时。</p>
@@ -1177,7 +1177,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">20</span>
+        <span class="site-state-item-count">19</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
