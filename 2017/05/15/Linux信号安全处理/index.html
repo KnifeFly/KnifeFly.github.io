@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.2" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="Linux," />
+
+
+
+
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.2" />
+
+
+
+
+
+
+<meta name="description" content="信号处理机制在 Linux 中，每个进程都拥有两个位向量，这两个位向量共同决定了进程将如何处理信号：    - 在 Linux 中，每个进程都拥有两个位向量，这两个位向量共同决定了进程将如何处理信号：    - 在 Linux 中，每个进程都拥有两个位向量，这两个位向量共同决定了进程将如何处理信号： 当内核发送一个信号给进程时，它将会修改进程的pending位向量，譬如说，当内核发送一个SIGIN">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux信号安全处理">
+<meta property="og:url" content="http://yoursite.com/2017/05/15/Linux%E4%BF%A1%E5%8F%B7%E5%AE%89%E5%85%A8%E5%A4%84%E7%90%86/index.html">
+<meta property="og:site_name" content="KnifeFly">
+<meta property="og:description" content="信号处理机制在 Linux 中，每个进程都拥有两个位向量，这两个位向量共同决定了进程将如何处理信号：    - 在 Linux 中，每个进程都拥有两个位向量，这两个位向量共同决定了进程将如何处理信号：    - 在 Linux 中，每个进程都拥有两个位向量，这两个位向量共同决定了进程将如何处理信号： 当内核发送一个信号给进程时，它将会修改进程的pending位向量，譬如说，当内核发送一个SIGIN">
+<meta property="og:locale">
+<meta property="article:published_time" content="2017-05-15T07:37:21.000Z">
+<meta property="article:modified_time" content="2022-09-18T12:28:22.444Z">
+<meta property="article:author" content="Yujie">
+<meta property="article:tag" content="Linux">
+<meta name="twitter:card" content="summary">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '',
+    scheme: 'Muse',
+    sidebar: {"position":"left","display":"post","offset":12,"offset_float":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2017/05/15/Linux信号安全处理/"/>
+
+
+
+
+
+  <title>Linux信号安全处理 | KnifeFly</title>
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">KnifeFly</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2017/05/15/Linux%E4%BF%A1%E5%8F%B7%E5%AE%89%E5%85%A8%E5%A4%84%E7%90%86/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">Linux信号安全处理</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2017-05-15T15:37:21+08:00">
+                2017-05-15
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="信号处理机制"><a href="#信号处理机制" class="headerlink" title="信号处理机制"></a>信号处理机制</h2><p>在 Linux 中，每个进程都拥有两个位向量，这两个位向量共同决定了进程将如何处理信号：<br>    - 在 Linux 中，每个进程都拥有两个位向量，这两个位向量共同决定了进程将如何处理信号：<br>    - 在 Linux 中，每个进程都拥有两个位向量，这两个位向量共同决定了进程将如何处理信号：</p>
+<p>当内核发送一个信号给进程时，它将会修改进程的pending位向量，譬如说，当内核发送一个SIGINT信号给进程，那么它会将进程的pending[SIGINT]的值设置成 1。同样地，当进程屏蔽掉一个信号时，那么它会修改blocked位向量。当进程屏蔽掉一个信号之后，内核仍然可以发送这个信号给进程(保存在进程的pending位向量中)，但进程不会接收并处理这个信号。只有当进程解除了对这个信号的屏蔽之后，进程才会接收并处理这个信号。</p>
+<p>下面的程序一开始就屏蔽了SIGINT信号，所以即使内核发送SIGINT信号给这个程序，这个信号也不会得到处理。而当程序解除了对SIGINT的屏蔽之后，这个SIGINT信号才会得到处理：</p>
+<span id="more"></span>
+
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;signal.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="type">void</span> <span class="title function_">sigint_handler</span><span class="params">(<span class="type">int</span> sig)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">const</span> <span class="type">char</span> *message = <span class="string">&quot;handle SIGINT signal\n&quot;</span>;</span><br><span class="line">    write(STDOUT_FILENO, message, <span class="built_in">strlen</span>(message));</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span></span><br><span class="line">&#123;</span><br><span class="line">    signal(SIGINT, sigint_handler);</span><br><span class="line">    <span class="type">sigset_t</span> mask, prev_mask;</span><br><span class="line">    sigemptyset(&amp;mask);</span><br><span class="line">    sigaddset(&amp;mask, SIGINT);</span><br><span class="line">    <span class="comment">// 屏蔽掉 SIGINT 信号</span></span><br><span class="line">    sigprocmask(SIG_BLOCK, &amp;mask, &amp;prev_mask);</span><br><span class="line">    <span class="comment">// 假设此时接收到 SIGINT 信号</span></span><br><span class="line">    sleep(<span class="number">10</span>);</span><br><span class="line">    <span class="comment">// 解除对 SIGINT 的屏蔽之后，进程会开始处理 SIGINT 信号</span></span><br><span class="line">    sigprocmask(SIG_SETMASK, &amp;prev_mask, <span class="literal">NULL</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="安全处理信号"><a href="#安全处理信号" class="headerlink" title="安全处理信号"></a>安全处理信号</h2><ul>
+<li>当进程接收到某个信号时，会调用这个信号的 handler，这会中断主程序的执行。</li>
+<li>当进程在执行某个信号 handler 的过程中，可能会被另一个信号 handler 中断。</li>
+</ul>
+<p>上面这两种情况都会带来并发安全的问题，因此在编写信号 handler 时，需要考虑到并发安全的问题。譬如说，由于信号 handler 会中断主程序的执行，如果信号 handler 与主程序共享全局变量，就可能带来并发安全的问题。</p>
+<p>信号 handler 与主程序共享全局变量是很常见的。譬如说，当进程在接收到SIGINT时，为了优雅地退出程序，这时可以使用一个全局变量记录是否接收到SIGINT信号。主程序每次进入循环时都会检查这个变量，如果发现进程接收到SIGINT信号，就释放好资源并退出程序</p>
+<p>上面的代码并不是并发安全的，可能导致两个问题：</p>
+<ul>
+<li><p>现代编译器通常会优化程序对变量的访问。主程序可能会将quit的副本存储在寄存器中，每次访问quit时就从寄存器中访问。那么即使信号 handler 修改了这个quit在内存中的值，主程序也可能不知道。</p>
+</li>
+<li><p>主程序会读取quit的值，信号 handler 会改变quit的值，而这两个操作都不保证是原子的</p>
+</li>
+</ul>
+<p>我们可以这样解决这两个问题：</p>
+<ul>
+<li><p>首先将quit声明为volatile变量。volatile可以阻止编译器所做的优化，这样信号 handler 和主程序访问quit时都会从主内存中访问</p>
+</li>
+<li><p>首先将quit声明为volatile变量。volatile可以阻止编译器所做的优化，这样信号 handler 和主程序访问quit时都会从主内存中访问</p>
+</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">volatile</span> <span class="type">sig_atomic_t</span> quit = <span class="number">0</span>;</span><br></pre></td></tr></table></figure>
+
+<h2 id="I-x2F-O-多路复用与信号"><a href="#I-x2F-O-多路复用与信号" class="headerlink" title="I&#x2F;O 多路复用与信号"></a>I&#x2F;O 多路复用与信号</h2><p>在 Linux 中处理信号是极为麻烦的事情，正如 Linux 标准指出的，当select()、poll()和epoll_wait()被信号中断之后，它们是决不会重启的，所以说如果这些函数被信号中断，我们只好手动重启它们</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">    <span class="type">int</span> n = epoll_wait(<span class="comment">/** ... **/</span>);</span><br><span class="line">    <span class="keyword">if</span> (n == <span class="number">-1</span> &amp;&amp; errno == EINTR) &#123;</span><br><span class="line">        <span class="keyword">continue</span>;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// ...</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>所幸的是 Linux 提供了signalfd()函数，signalfd()可以将接收到的信号，转化为文件描述符的可读事件，所以signalfd()可以和 select&#x2F;poll&#x2F;epoll 配合使用，大大简化信号处理的难度。</p>
+<p>下面的例子将signalfd()与 epoll 配合使用，signalfd()负责将接收到的SIGINT和SIGHUP转换为文件描述符的可读事件：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/epoll.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;signal.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/signalfd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdbool.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;assert.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// 屏蔽信号 SIGINT 和 SIGHUP</span></span><br><span class="line">    <span class="type">sigset_t</span> mask;</span><br><span class="line">    sigemptyset(&amp;mask);</span><br><span class="line">    sigaddset(&amp;mask, SIGINT);</span><br><span class="line">    sigaddset(&amp;mask, SIGHUP);</span><br><span class="line">    sigprocmask(SIG_BLOCK, &amp;mask, <span class="literal">NULL</span>);</span><br><span class="line">    <span class="type">int</span> signal_fd = signalfd(<span class="number">-1</span>, &amp;mask, SFD_NONBLOCK | SFD_CLOEXEC);</span><br><span class="line">    <span class="type">int</span> epoll_fd = epoll_create1(EPOLL_CLOEXEC);</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">epoll_event</span> <span class="title">event</span>;</span></span><br><span class="line">    <span class="built_in">memset</span>(&amp;event, <span class="number">0</span>, <span class="keyword">sizeof</span>(event));</span><br><span class="line">    event.events = EPOLLIN;</span><br><span class="line">    event.data.fd = signal_fd;</span><br><span class="line">    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, signal_fd, &amp;event);</span><br><span class="line">    <span class="type">const</span> <span class="type">int</span> MAX_EVENTS = <span class="number">64</span>;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">epoll_event</span> <span class="title">events</span>[<span class="title">MAX_EVENTS</span>];</span></span><br><span class="line">    <span class="keyword">while</span> (<span class="literal">true</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="type">int</span> n = epoll_wait(epoll_fd, &amp;events[<span class="number">0</span>], MAX_EVENTS, <span class="number">0</span>);</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; n; ++i)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">if</span> (events[i].data.fd == signal_fd)</span><br><span class="line">            &#123;</span><br><span class="line">                <span class="class"><span class="keyword">struct</span> <span class="title">signalfd_siginfo</span> <span class="title">info</span>;</span></span><br><span class="line">                <span class="type">ssize_t</span> bytes = read(signal_fd, &amp;info, <span class="keyword">sizeof</span>(info));</span><br><span class="line">                assert(bytes == <span class="keyword">sizeof</span>(info));</span><br><span class="line">                <span class="keyword">if</span> (info.ssi_signo == SIGINT)</span><br><span class="line">                &#123;</span><br><span class="line">                    <span class="built_in">printf</span>(<span class="string">&quot;receive signal SIGINT\n&quot;</span>);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">else</span> <span class="keyword">if</span> (info.ssi_signo == SIGHUP)</span><br><span class="line">                &#123;</span><br><span class="line">                    <span class="built_in">printf</span>(<span class="string">&quot;receive signal SIGHUP\n&quot;</span>);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;Program quit!\n&quot;</span>);</span><br><span class="line">                <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+<p>参考资料：<a target="_blank" rel="noopener" href="http://senlinzhan.github.io/2017/03/02/linux-signal/">http://senlinzhan.github.io/2017/03/02/linux-signal/</a></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Linux/" rel="tag"># Linux</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/04/15/MySQL%20%E5%AD%98%E5%82%A8%E5%BC%95%E6%93%8E-MyISAM%E4%B8%8EInnoDB/" rel="next" title="MySQL 存储引擎-MyISAM与InnoDB差异">
+                <i class="fa fa-chevron-left"></i> MySQL 存储引擎-MyISAM与InnoDB差异
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/07/15/nginx-%E7%B3%BB%E7%BB%9F%E6%A1%86%E6%9E%B6/" rel="prev" title="nginx 系统框架">
+                nginx 系统框架 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar.gif"
+               alt="" />
+          <p class="site-author-name" itemprop="name"></p>
+           
+              <p class="site-description motion-element" itemprop="description"></p>
+          
+        </div>
+        <nav class="site-state motion-element">
+
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives/">
+                <span class="site-state-item-count">43</span>
+                <span class="site-state-item-name">日志</span>
+              </a>
+            </div>
+          
+
+          
+
+          
+            
+            
+            <div class="site-state-item site-state-tags">
+              <a href="/tags/index.html">
+                <span class="site-state-item-count">19</span>
+                <span class="site-state-item-name">标签</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+
+        <div class="links-of-author motion-element">
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BF%A1%E5%8F%B7%E5%A4%84%E7%90%86%E6%9C%BA%E5%88%B6"><span class="nav-number">1.</span> <span class="nav-text">信号处理机制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%89%E5%85%A8%E5%A4%84%E7%90%86%E4%BF%A1%E5%8F%B7"><span class="nav-number">2.</span> <span class="nav-text">安全处理信号</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#I-x2F-O-%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8%E4%B8%8E%E4%BF%A1%E5%8F%B7"><span class="nav-number">3.</span> <span class="nav-text">I&#x2F;O 多路复用与信号</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Yujie</span>
+</div>
+
+
+<div class="powered-by">
+  由 <a class="theme-link" target="_blank" rel="noopener" href="https://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" target="_blank" rel="noopener" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Muse
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.2"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.2"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.2"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.2"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.2"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
