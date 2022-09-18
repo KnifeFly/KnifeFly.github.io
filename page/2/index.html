@@ -1546,7 +1546,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/02/14/kafka%E9%AB%98%E5%8F%AF%E7%94%A8%E8%AE%BE%E8%AE%A1(%E4%B8%8B)/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/02/14/kafka%20%E9%AB%98%E5%8F%AF%E7%94%A8%E8%AE%BE%E8%AE%A1(%E4%B8%8A)/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="">
@@ -1565,7 +1565,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2019/02/14/kafka%E9%AB%98%E5%8F%AF%E7%94%A8%E8%AE%BE%E8%AE%A1(%E4%B8%8B)/" itemprop="url">kafka高可用设计(下)</a></h1>
+                <a class="post-title-link" href="/2019/02/14/kafka%20%E9%AB%98%E5%8F%AF%E7%94%A8%E8%AE%BE%E8%AE%A1(%E4%B8%8A)/" itemprop="url">kafka高可用设计(上)</a></h1>
         
 
         <div class="post-meta">
@@ -1616,20 +1616,24 @@
 
       
         
-          <p>本文转发自<a target="_blank" rel="noopener" href="http://www.jasongj.com/"><strong>技术世界</strong></a>，<a target="_blank" rel="noopener" href="http://www.jasongj.com/2015/06/08/KafkaColumn3">原文链接</a>　<a target="_blank" rel="noopener" href="http://www.jasongj.com/2015/06/08/KafkaColumn3">http://www.jasongj.com/2015/06/08/KafkaColumn3</a></p>
-<p>本文在上篇文章 基础上，更加深入讲解了Kafka的HA机制，主要阐述了HA相关各种场景，如Broker failover，Controller failover，Topic创建&#x2F;删除，Broker启动，Follower从Leader fetch数据等详细处理过程。同时介绍了Kafka提供的与Replication相关的工具，如重新分配Partition等。</p>
-<h1 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h1><p>　　本文在上篇文章基础上，更加深入讲解了Kafka的HA机制，主要阐述了HA相关各种场景，如Broker failover，Controller failover，Topic创建&#x2F;删除，Broker启动，Follower从Leader fetch数据等详细处理过程。同时介绍了Kafka提供的与Replication相关的工具，如重新分配Partition等。</p>
-<h1 id="Broker-Failover过程"><a href="#Broker-Failover过程" class="headerlink" title="Broker Failover过程"></a>Broker Failover过程</h1><h2 id="Controller对Broker-failure的处理过程"><a href="#Controller对Broker-failure的处理过程" class="headerlink" title="Controller对Broker failure的处理过程"></a>Controller对Broker failure的处理过程</h2><ol>
-<li>Controller在Zookeeper的<code>/brokers/ids</code>节点上注册Watch。一旦有Broker宕机（本文用宕机代表任何让Kafka认为其Broker die的情景，包括但不限于机器断电，网络不可用，GC导致的Stop The World，进程crash等），其在Zookeeper对应的Znode会自动被删除，Zookeeper会fire Controller注册的Watch，Controller即可获取最新的幸存的Broker列表。</li>
-<li>Controller决定set_p，该集合包含了宕机的所有Broker上的所有Partition。</li>
-<li>对set_p中的每一个Partition：<br>　　3.1 从<code>/brokers/topics/[topic]/partitions/[partition]/state</code>读取该Partition当前的ISR。<br>　　3.2 决定该Partition的新Leader。如果当前ISR中有至少一个Replica还幸存，则选择其中一个作为新Leader，新的ISR则包含当前ISR中所有幸存的Replica。否则选择该Partition中任意一个幸存的Replica作为新的Leader以及ISR（该场景下可能会有潜在的数据丢失）。如果该Partition的所有Replica都宕机了，则将新的Leader设置为-1。<br>　　3.3 将新的Leader，ISR和新的<code>leader_epoch</code>及<code>controller_epoch</code>写入<code>/brokers/topics/[topic]/partitions/[partition]/state</code>。注意，该操作只有Controller版本在3.1至3.3的过程中无变化时才会执行，否则跳转到3.1。</li>
-<li>直接通过RPC向set_p相关的Broker发送LeaderAndISRRequest命令。Controller可以在一个RPC操作中发送多个命令从而提高效率。<br>　　Broker failover顺序图如下所示。<br><a target="_blank" rel="noopener" href="http://www.jasongj.com/img/kafka/KafkaColumn2/kafka_broker_failover.png"><img src="http://www.jasongj.com/img/kafka/KafkaColumn2/kafka_broker_failover.png" alt="broker failover sequence diagram "></a></li>
+          <p>本文转发自<a target="_blank" rel="noopener" href="http://www.jasongj.com/"><strong>技术世界</strong></a>，<a target="_blank" rel="noopener" href="http://www.jasongj.com/2015/04/24/KafkaColumn2">原文链接</a>　<a target="_blank" rel="noopener" href="http://www.jasongj.com/2015/04/24/KafkaColumn2">http://www.jasongj.com/2015/04/24/KafkaColumn2</a></p>
+<h1 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h1><p>　　Kafka在0.8以前的版本中，并不提供High Availablity机制，一旦一个或多个Broker宕机，则宕机期间其上所有Partition都无法继续提供服务。若该Broker永远不能再恢复，亦或磁盘故障，则其上数据将丢失。而Kafka的设计目标之一即是提供数据持久化，同时对于分布式系统来说，尤其当集群规模上升到一定程度后，一台或者多台机器宕机的可能性大大提高，对于Failover机制的需求非常高。因此，Kafka从0.8开始提供High Availability机制。本文从Data Replication和Leader Election两方面介绍了Kafka的HA机制。</p>
+<h1 id="Kafka为何需要High-Available"><a href="#Kafka为何需要High-Available" class="headerlink" title="Kafka为何需要High Available"></a>Kafka为何需要High Available</h1><h2 id="为何需要Replication"><a href="#为何需要Replication" class="headerlink" title="为何需要Replication"></a>为何需要Replication</h2><p>　　在Kafka在0.8以前的版本中，是没有Replication的，一旦某一个Broker宕机，则其上所有的Partition数据都不可被消费，这与Kafka数据持久性及Delivery Guarantee的设计目标相悖。同时Producer都不能再将数据存于这些Partition中。</p>
+<ul>
+<li>如果Producer使用同步模式则Producer会在尝试重新发送<code>message.send.max.retries</code>（默认值为3）次后抛出Exception，用户可以选择停止发送后续数据也可选择继续选择发送。而前者会造成数据的阻塞，后者会造成本应发往该Broker的数据的丢失。</li>
+<li>如果Producer使用异步模式，则Producer会尝试重新发送<code>message.send.max.retries</code>（默认值为3）次后记录该异常并继续发送后续数据，这会造成数据丢失并且用户只能通过日志发现该问题。</li>
+</ul>
+<p>　　由此可见，在没有Replication的情况下，一旦某机器宕机或者某个Broker停止工作则会造成整个系统的可用性降低。随着集群规模的增加，整个集群中出现该类异常的几率大大增加，因此对于生产系统而言Replication机制的引入非常重要。 　　</p>
+<h2 id="为何需要Leader-Election"><a href="#为何需要Leader-Election" class="headerlink" title="为何需要Leader Election"></a>为何需要Leader Election</h2><p>　　（本文所述Leader Election主要指Replica之间的Leader Election）<br>　　引入Replication之后，同一个Partition可能会有多个Replica，而这时需要在这些Replica中选出一个Leader，Producer和Consumer只与这个Leader交互，其它Replica作为Follower从Leader中复制数据。<br>　　因为需要保证同一个Partition的多个Replica之间的数据一致性（其中一个宕机后其它Replica必须要能继续服务并且即不能造成数据重复也不能造成数据丢失）。如果没有一个Leader，所有Replica都可同时读&#x2F;写数据，那就需要保证多个Replica之间互相（N×N条通路）同步数据，数据的一致性和有序性非常难保证，大大增加了Replication实现的复杂性，同时也增加了出现异常的几率。而引入Leader后，只有Leader负责数据读写，Follower只向Leader顺序Fetch数据（N条通路），系统更加简单且高效。 　　 　　</p>
+<h1 id="Kafka-HA设计解析"><a href="#Kafka-HA设计解析" class="headerlink" title="Kafka HA设计解析"></a>Kafka HA设计解析</h1><h2 id="如何将所有Replica均匀分布到整个集群"><a href="#如何将所有Replica均匀分布到整个集群" class="headerlink" title="如何将所有Replica均匀分布到整个集群"></a>如何将所有Replica均匀分布到整个集群</h2><p>　　为了更好的做负载均衡，Kafka尽量将所有的Partition均匀分配到整个集群上。一个典型的部署方式是一个Topic的Partition数量大于Broker的数量。同时为了提高Kafka的容错能力，也需要将同一个Partition的Replica尽量分散到不同的机器。实际上，如果所有的Replica都在同一个Broker上，那一旦该Broker宕机，该Partition的所有Replica都无法工作，也就达不到HA的效果。同时，如果某个Broker宕机了，需要保证它上面的负载可以被均匀的分配到其它幸存的所有Broker上。<br>　　Kafka分配Replica的算法如下：</p>
+<ol>
+<li>将所有Broker（假设共n个Broker）和待分配的Partition排序</li>
+<li>将第i个Partition分配到第（i mod n）个Broker上</li>
+<li>将第i个Partition的第j个Replica分配到第（(i + j) mod n）个Broker上</li>
 </ol>
-<p>　　LeaderAndIsrRequest结构如下<br><a target="_blank" rel="noopener" href="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrRequest.png"><img src="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrRequest.png" alt="LeaderAndIsrRequest"></a></p>
-<p>　　LeaderAndIsrResponse结构如下<br><a target="_blank" rel="noopener" href="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrResponse.png"><img src="http://www.jasongj.com/img/kafka/KafkaColumn3/LeaderAndIsrResponse.png" alt="LeaderAndIsrResponse"></a></p>
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2019/02/14/kafka%E9%AB%98%E5%8F%AF%E7%94%A8%E8%AE%BE%E8%AE%A1(%E4%B8%8B)/#more" rel="contents">
+            <a class="btn" href="/2019/02/14/kafka%20%E9%AB%98%E5%8F%AF%E7%94%A8%E8%AE%BE%E8%AE%A1(%E4%B8%8A)/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
