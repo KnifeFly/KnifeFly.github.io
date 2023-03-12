@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="Clean Architecture本文翻译自Robert C. Martin的博文The Clean Architecture 在过去的几年里，我们已经看到了一系列关于系统架构的想法，这些包括：  六边形架构 洋葱架构 Screaming Architecture DCI BCE  尽管这些架构在细节上都有所不同，但它们非常相似。它们都有相同的目标，即关注点分离。他们都通过将软件分层来实现这种分">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Clean Architecture">
+<meta property="og:url" content="http://yoursite.com/2020/03/05/Clean%20Architecture/index.html">
+<meta property="og:site_name" content="KnifeFly">
+<meta property="og:description" content="Clean Architecture本文翻译自Robert C. Martin的博文The Clean Architecture 在过去的几年里，我们已经看到了一系列关于系统架构的想法，这些包括：  六边形架构 洋葱架构 Screaming Architecture DCI BCE  尽管这些架构在细节上都有所不同，但它们非常相似。它们都有相同的目标，即关注点分离。他们都通过将软件分层来实现这种分">
+<meta property="og:locale">
+<meta property="og:image" content="https://blog.cleancoder.com/uncle-bob/images/2012-08-13-the-clean-architecture/CleanArchitecture.jpg">
+<meta property="article:published_time" content="2020-03-05T10:41:13.000Z">
+<meta property="article:modified_time" content="2023-03-12T09:37:56.427Z">
+<meta property="article:author" content="Yujie">
+<meta property="article:tag" content="架构设计">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://blog.cleancoder.com/uncle-bob/images/2012-08-13-the-clean-architecture/CleanArchitecture.jpg">
+
+<link rel="canonical" href="http://yoursite.com/2020/03/05/Clean%20Architecture/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>Clean Architecture | KnifeFly</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">KnifeFly</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/03/05/Clean%20Architecture/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Clean Architecture
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2020-03-05 18:41:13" itemprop="dateCreated datePublished" datetime="2020-03-05T18:41:13+08:00">2020-03-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-03-12 17:37:56" itemprop="dateModified" datetime="2023-03-12T17:37:56+08:00">2023-03-12</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="Clean-Architecture"><a href="#Clean-Architecture" class="headerlink" title="Clean Architecture"></a>Clean Architecture</h1><p>本文翻译自Robert C. Martin的博文<a target="_blank" rel="noopener" href="https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html">The Clean Architecture</a></p>
+<p>在过去的几年里，我们已经看到了一系列关于系统架构的想法，这些包括：</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="http://alistair.cockburn.us/Hexagonal+architecture">六边形架构</a></li>
+<li><a target="_blank" rel="noopener" href="http://jeffreypalermo.com/blog/the-onion-architecture-part-1/">洋葱架构</a></li>
+<li><a target="_blank" rel="noopener" href="http://blog.cleancoders.com/2011-09-30-Screaming-Architecture">Screaming Architecture</a></li>
+<li><a target="_blank" rel="noopener" href="http://www.amazon.com/Lean-Architecture-Agile-Software-Development/dp/0470684208/">DCI</a></li>
+<li><a target="_blank" rel="noopener" href="http://www.amazon.com/Object-Oriented-Software-Engineering-Approach/dp/0201544350">BCE</a></li>
+</ul>
+<p>尽管这些架构在细节上都有所不同，但它们非常相似。它们都有相同的目标，即关注点分离。他们都通过将软件分层来实现这种分离，这些架构里面至少有一个业务层，其他都是接口层。</p>
+<p>这些架构都有以下特性：</p>
+<ul>
+<li>框架独立性，不依赖于特定的软件库框架，这样你可以像工具一样使用这种框架，而不需要让你的系统受到它的约束条件；</li>
+<li>可测试性，可以在没有 UI、数据库、Web 服务器或任何其他外部依赖的情况下可以测试业务规则；</li>
+<li>UI独立性，UI 可以轻松更改，而无需更改系统的其余部分。例如，可以用控制台 UI 替换 Web UI，而无需更改业务规则；</li>
+<li>数据库独立性，可以将 Oracle 或 SQL Server 换成 Mongo、BigTable、CouchDB 或其他东西，业务规则未绑定到数据库；</li>
+<li>外部依赖独立性，事实上业务逻辑代码不应该和外部具体实现打交道；</li>
+</ul>
+<p><a target="_blank" rel="noopener" href="https://blog.cleancoder.com/uncle-bob/images/2012-08-13-the-clean-architecture/CleanArchitecture.jpg"><img src="https://blog.cleancoder.com/uncle-bob/images/2012-08-13-the-clean-architecture/CleanArchitecture.jpg" alt="img"></a></p>
+<h2 id="The-Dependency-Rule"><a href="#The-Dependency-Rule" class="headerlink" title="The Dependency Rule"></a>The Dependency Rule</h2><p>同心圆代表软件的不同领域，一般来说，越往外圈软件的层次就越高，外圈是机制，内圈是政策。</p>
+<p>使这个整洁架构工作的最重要的规则是<em>依赖规则</em>。这个规则说明了源代码依赖只能向内。内圈中结构不需要知道外圈具体实现，特别是，在外圈中声明的事物的名称不能被内圈中的代码提及。这包括函数、类、变量或任何任何实体信息。</p>
+<h2 id="Entities"><a href="#Entities" class="headerlink" title="Entities"></a><em>Entities</em></h2><p><em>Entity</em>封装了<em>企业范围的</em>业务规则。实体可以是具有方法的对象，也可以是一组数据结构和函数。</p>
+<p>如果你不是企业级，只是编写单个应用程序，那么这些实体就是应用程序的业务对象。它们封装了最通用和最高级的规则。当外部事物发生变化时，它们最不可能发生变化。例如，不会期望这些对象会受到页面导航或安全性更改的影响。对任何特定应用程序的操作更改都不应影响实体层。</p>
+<h2 id="Use-Cases"><a href="#Use-Cases" class="headerlink" title="Use Cases"></a>Use Cases</h2><p>该层中的软件包含<em>特定于应用程序的</em>业务规则。它封装并实现了系统的所有用例。这些用例协调进出实体的数据流，并指导这些Entity使用其<em>企业范围的</em>业务规则来实现用例(Use cases)的目标。</p>
+<p>我们预计这一层的变化不会影响实体。我们也不希望这一层受到外部变化的影响，例如数据库、UI 或任何常见框架。该层与此类问题隔离。</p>
+<p>当然我们期望对于应用操作的变化会影响用例而进一步影响到这层的软件。 如果一个用例的细节变化了，那么这层的代码肯定也会被影响。</p>
+<h2 id="Interface-Adapters"><a href="#Interface-Adapters" class="headerlink" title="Interface Adapters"></a>Interface Adapters</h2><p>该层中的软件是一组适配器，可将数据从最适合用例和实体的格式转换为最适合某些外部机构（如数据库或 Web）的格式。例如，正是这一层将完全包含 GUI 的 MVC 架构。Presenters、Views 和 Controllers 都属于这里。模型可能只是从控制器传递到用例，然后从用例返回到演示者和视图的数据结构。</p>
+<p>类似地，在这一层中，数据从对实体和用例最方便的形式转换为对正在使用的任何持久性框架最方便的形式。即数据库。这个圈子内的任何代码都不应该对数据库有任何了解。如果数据库是 SQL 数据库，那么所有的 SQL 都应该限制在这一层，特别是限制在这一层与数据库有关的部分。</p>
+<p>在这一层中还有任何其他适配器，用于将数据从某种外部形式（例如外部服务）转换为用例和实体使用的内部形式。</p>
+<h2 id="Frameworks-and-Drivers"><a href="#Frameworks-and-Drivers" class="headerlink" title="Frameworks and Drivers."></a>Frameworks and Drivers.</h2><p>最外层一般由框架和工具组成，如数据库、Web 框架等。通常在这一层你不会写太多代码，除了与下一个循环往内通信的胶水代码。</p>
+<p>这一层是所有细节的所在。网络是一个细节。数据库是一个细节。我们把这些东西放在外面，它们不会造成什么伤害。</p>
+<h2 id="Only-Four-Circles"><a href="#Only-Four-Circles" class="headerlink" title="Only Four Circles?"></a>Only Four Circles?</h2><p>不，圆圈是示意性的。你可能会发现需要的不仅仅是这四个。没有规则说你必须总是只有这四个。但是，<em>依赖规则</em>始终适用。源代码依赖项总是指向内部。随着向内移动，抽象级别会增加。最外圈是低层次的具体细节。随着向内移动，软件变得更加抽象，并封装了更高级别的策略。最内圈是最一般的。</p>
+<h2 id="Crossing-boundaries"><a href="#Crossing-boundaries" class="headerlink" title="Crossing boundaries."></a>Crossing boundaries.</h2><p>在图的右下方是我们穿越圆圈边界的示例。它展示了Controller和Presenter与下一层的用例进行通信。注意控制流。它从controller出发，穿过用例，然后在presenter里执行。也注意下源码依赖。它们每个都指向内部的用例。</p>
+<p>我们通常使用<a href="https://link.zhihu.com/?target=http://en.wikipedia.org/wiki/Dependency_inversion_principle">依赖反转原则</a>解决这个明显的问题。在java这样的语言中，我们会整理源码依赖与控制流相反的接口和继承关系，让它们从边界正确的穿过。</p>
+<p>例如，用例需要调用presenter。但是，这个调用不能直接进行因为会违反<strong>依赖规则</strong>。外圈的名字不能被内圈提到。所以我们的用例调用内圈的一个接口（在这个例子里是Use Case Output Port），并让外圈的presenter实现它。</p>
+<p>架构里所有的边界穿越都用这个技巧。我们使用动态多态来创建与控制流相反的源码依赖，以便于无论在控制流的任何方向都不会违反<strong>依赖规则</strong>。</p>
+<h2 id="What-data-crosses-the-boundaries"><a href="#What-data-crosses-the-boundaries" class="headerlink" title="What data crosses the boundaries."></a>What data crosses the boundaries.</h2><p>正常来说穿过边界的数据是简单数据结构。你可以使用基本结构或简单的Data Transfer 对象。或者可以方便的进行函数赋值的数据。或者你可以打包进一个hashmap，或者将它组装成一个对象。重要的是穿过边界的是隔离，简单的数据结构。我们不想搞变通传递<strong>实体</strong>或数据库行数据。我们不想数据结构有任何违反<strong>依赖规则</strong>的依赖。</p>
+<p>例如，很多数据库框架在查询后返回一个方便的数据格式。我们可以叫它RowStructure(行结构)。我们不想将这个行机构通过边界传递给内部的圈。这会导致内部圈需要知道外部圈的内容进而违反<strong>依赖规则</strong>。</p>
+<p>所以当我们在边界传递数据是，要注意其应该是内部圈的格式。</p>
+<h2 id="Conclusion"><a href="#Conclusion" class="headerlink" title="Conclusion"></a>Conclusion</h2><p>遵守这些简单的规则并不难，并且会省去很多麻烦。通过将软件分层并遵守<em>依赖规则</em>，创建一个本质上可测试的系统，并具有所有暗示的好处。当系统的任何外部部件（如数据库或 Web 框架）过时时，可以轻松替换那些过时的元素。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/" rel="tag"># 架构设计</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/03/02/Go%20%E4%BE%9D%E8%B5%96%E6%B3%A8%E5%85%A5/" rel="prev" title="Go Clean Architecture 实现">
+      <i class="fa fa-chevron-left"></i> Go Clean Architecture 实现
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/03/25/Go%20Clean%20Architecture%20%E5%AE%9E%E7%8E%B0/" rel="next" title="Go Clean Architecture 实现">
+      Go Clean Architecture 实现 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Clean-Architecture"><span class="nav-number">1.</span> <span class="nav-text">Clean Architecture</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#The-Dependency-Rule"><span class="nav-number">1.1.</span> <span class="nav-text">The Dependency Rule</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Entities"><span class="nav-number">1.2.</span> <span class="nav-text">Entities</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Use-Cases"><span class="nav-number">1.3.</span> <span class="nav-text">Use Cases</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Interface-Adapters"><span class="nav-number">1.4.</span> <span class="nav-text">Interface Adapters</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Frameworks-and-Drivers"><span class="nav-number">1.5.</span> <span class="nav-text">Frameworks and Drivers.</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Only-Four-Circles"><span class="nav-number">1.6.</span> <span class="nav-text">Only Four Circles?</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Crossing-boundaries"><span class="nav-number">1.7.</span> <span class="nav-text">Crossing boundaries.</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#What-data-crosses-the-boundaries"><span class="nav-number">1.8.</span> <span class="nav-text">What data crosses the boundaries.</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Conclusion"><span class="nav-number">1.9.</span> <span class="nav-text">Conclusion</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Yujie</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">45</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Yujie</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

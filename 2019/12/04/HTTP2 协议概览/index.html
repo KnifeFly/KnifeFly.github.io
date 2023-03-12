@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="HTTP2协议-概览HTTP&#x2F;1.1 自从 1997 年发布以来，我们已经使用 HTTP&#x2F;1.x 相当长一段时间了，但是随着近十年互联网的爆炸式发展，从当初网页内容以文本为主, 到现在以富媒体（如图片、声音、视频）为主, 而且对页面内容实时性要求高的应用越来越多 （如聊天、视频直播）, 于是当时协议规定的某些特性，已经无法满足现代网络的需求了。 HTTP1.1 协议缺陷 请求响">
+<meta property="og:type" content="article">
+<meta property="og:title" content="HTTP2协议-概览">
+<meta property="og:url" content="http://yoursite.com/2019/12/04/HTTP2%20%E5%8D%8F%E8%AE%AE%E6%A6%82%E8%A7%88/index.html">
+<meta property="og:site_name" content="KnifeFly">
+<meta property="og:description" content="HTTP2协议-概览HTTP&#x2F;1.1 自从 1997 年发布以来，我们已经使用 HTTP&#x2F;1.x 相当长一段时间了，但是随着近十年互联网的爆炸式发展，从当初网页内容以文本为主, 到现在以富媒体（如图片、声音、视频）为主, 而且对页面内容实时性要求高的应用越来越多 （如聊天、视频直播）, 于是当时协议规定的某些特性，已经无法满足现代网络的需求了。 HTTP1.1 协议缺陷 请求响">
+<meta property="og:locale">
+<meta property="og:image" content="http://yoursite.com/images/http1_keepalive.png">
+<meta property="og:image" content="http://yoursite.com/Users/knife/Blog/blog_source/source/images/http1.1_pipelining.png">
+<meta property="og:image" content="http://yoursite.com/images/http2_frame_overview.svg">
+<meta property="og:image" content="http://yoursite.com/images/http2_stream_frame.svg">
+<meta property="og:image" content="http://yoursite.com/images/http2_request_response_overview.png">
+<meta property="og:image" content="http://yoursite.com/images/http2_stream_header.svg">
+<meta property="article:published_time" content="2019-12-04T02:05:29.000Z">
+<meta property="article:modified_time" content="2023-03-12T09:01:58.612Z">
+<meta property="article:author" content="Yujie">
+<meta property="article:tag" content="web">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://yoursite.com/images/http1_keepalive.png">
+
+<link rel="canonical" href="http://yoursite.com/2019/12/04/HTTP2%20%E5%8D%8F%E8%AE%AE%E6%A6%82%E8%A7%88/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>HTTP2协议-概览 | KnifeFly</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">KnifeFly</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/12/04/HTTP2%20%E5%8D%8F%E8%AE%AE%E6%A6%82%E8%A7%88/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          HTTP2协议-概览
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2019-12-04 10:05:29" itemprop="dateCreated datePublished" datetime="2019-12-04T10:05:29+08:00">2019-12-04</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-03-12 17:01:58" itemprop="dateModified" datetime="2023-03-12T17:01:58+08:00">2023-03-12</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="HTTP2协议-概览"><a href="#HTTP2协议-概览" class="headerlink" title="HTTP2协议-概览"></a>HTTP2协议-概览</h1><p>HTTP&#x2F;1.1 自从 1997 年发布以来，我们已经使用 HTTP&#x2F;1.x 相当长一段时间了，但是随着近十年互联网的爆炸式发展，从当初网页内容以文本为主, 到现在以富媒体（如图片、声音、视频）为主, 而且对页面内容实时性要求高的应用越来越多 （如聊天、视频直播）, 于是当时协议规定的某些特性，已经无法满足现代网络的需求了。</p>
+<h2 id="HTTP1-1-协议缺陷"><a href="#HTTP1-1-协议缺陷" class="headerlink" title="HTTP1.1 协议缺陷"></a>HTTP1.1 协议缺陷</h2><ol>
+<li>请求响应延迟问题</li>
+</ol>
+<p>HTTP1.0协议模型只支持请求-响应，所有的请求和响应是串行的，也就是说HTTP协议客户端发送一个请求必须要等到服务端响应之后才能再发下一个请求，并且每次请求时必须重新创建TCP连接，这种通信模型效率很低，根本无法满足通信需求。</p>
+<p>HTTP1.1增加了Keep-alive机制和Pipelining机制，前者主要解决每次HTTP请求必须要创建TCP连接的问题；后者主要解决请求-响应串行问题。</p>
+<span id="more"></span>
+
+<p>Keep-alive指的是客户端和服务器在TCP建联之后双方保持连接，减小因为TCP建连三次握手的开销，HTTP1.1协议默认开启keep-alive，http1.0需要设置Connection: Keep-Alive头部来启用。Chrome浏览器针对单个域名最多支持6个连接，连接开启多了则消耗客户端和服务器资源，连接太少则通信效率低。Keep-alive可缓解请求响应延迟，但是该方案不是最优。</p>
+<p>​    <img src="/images/http1_keepalive.png" alt="http1_keepalive"></p>
+<p>Pipeline机制本质是合并请求提高服务器资源的利用，该机制目前有个<code>队列头部阻塞问题</code>，该问题指的是<strong>当顺序发送的请求序列中的一个请求因为某种原因被阻塞时，在后面排队的所有请求也一并被阻塞，会导致客户端迟迟收不到数据</strong>。<strong>产生头部阻塞的根本原因是因为HTTP1.1响应包因为不携带序号之类的机制，所以HTTP服务器在响应请求时需要顺序响应，如果前一个响应阻塞则后面响应内容会延迟</strong>。<img src="/Users/knife/Blog/blog_source/source/images/http1.1_pipelining.png" alt="http1.1_pipelining"></p>
+<ol start="2">
+<li>HTTP头部消耗</li>
+</ol>
+<p> HTTP1.1头部中携带很多header信息，例如User-Agent、Cookie、Server、Accept等，对于body只有几十字节的请求，header大小有时候高达到数百字节。Header 里携带的内容过大，在一定程度上增加了传输成本。更要命的是，成千上万的请求响应报文里有很多字段值都是重复的，非常浪费。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">accept-ranges: bytes</span><br><span class="line">age: 123163</span><br><span class="line">alt-svc: quic=&quot;:443&quot;; ma=2592000; v=&quot;46,43&quot;,h3-Q050=&quot;:443&quot;; ma=2592000,h3-Q049=&quot;:443&quot;; ma=2592000,h3-Q048=&quot;:443&quot;; ma=2592000,h3-Q046=&quot;:443&quot;; ma=2592000,h3-Q043=&quot;:443&quot;; ma=2592000</span><br><span class="line">cache-control: public, max-age=31536000</span><br><span class="line">content-encoding: br</span><br><span class="line">content-length: 46751</span><br><span class="line">content-type: text/javascript; charset=UTF-8</span><br><span class="line">date: Thu, 28 Nov 2019 17:37:15 GMT</span><br><span class="line">expires: Fri, 27 Nov 2020 17:37:15 GMT</span><br><span class="line">last-modified: Wed, 27 Nov 2019 21:19:14 GMT</span><br><span class="line">server: sffe</span><br><span class="line">status: 200</span><br><span class="line">vary: Accept-Encoding</span><br><span class="line">x-content-type-options: nosniff</span><br><span class="line">x-xss-protection: 0</span><br></pre></td></tr></table></figure>
+
+
+
+<ol start="3">
+<li>明文传输带来的安全问题</li>
+</ol>
+<p>  HTTP&#x2F;1.1 在传输数据时，所有传输的内容都是明文，客户端和服务器端都无法验证对方的身份，这在一定程度上无法保证数据的安全性。</p>
+<h2 id="SPDY协议"><a href="#SPDY协议" class="headerlink" title="SPDY协议"></a>SPDY协议</h2><p>SPDY 是 Google 开发的一个实验性协议，于 2009 年年中发布，其主要目标是通过解决 HTTP&#x2F;1.1 中广为人知的一些性能限制来减少网页的加载延迟。具体来说，这个项目设定的目标如下：</p>
+<ul>
+<li>页面加载时间 (PLT) 减少 50%。</li>
+<li>无需网站作者修改任何内容。</li>
+<li>将部署复杂性降至最低，无需变更网络基础设施。</li>
+<li>与开源社区合作开发此新协议。</li>
+<li>收集真实性能数据，验证实验性协议是否有效。</li>
+</ul>
+<p>目前Chrome已在2016年停止对SPDY的支持，采用支持HTTP2协议，SPDY协议当做HTTP2协议基础，并由此演变为HTTP2协议。</p>
+<h2 id="HTTP2-协议"><a href="#HTTP2-协议" class="headerlink" title="HTTP2 协议"></a>HTTP2 协议</h2><p>2015 年，HTTP&#x2F;2 发布。HTTP&#x2F;2 是现行 HTTP 协议（HTTP&#x2F;1.x）的替代，但它不是重写，HTTP 方法 &#x2F; 状态码 &#x2F; 语义都与 HTTP&#x2F;1.x 一样。<strong>HTTP&#x2F;2 基于 SPDY，专注于性能，最大的目标是在用户和网站间只用一个连接（connec-tion）</strong>。从目前的情况来看，国内外一些排名靠前的站点基本都实现了 HTTP&#x2F;2 的部署，使用 HTTP&#x2F;2 能带来 20%~60% 的效率提升。</p>
+<p>HTTP&#x2F;2 由两个规范（Specification）组成：</p>
+<ol>
+<li>Hypertext Transfer Protocol version 2 - RFC7540</li>
+<li>HPACK - Header Compression for HTTP&#x2F;2 - RFC7541</li>
+</ol>
+<h2 id="HTTP2-特性"><a href="#HTTP2-特性" class="headerlink" title="HTTP2 特性"></a>HTTP2 特性</h2><h3 id="二进制传输"><a href="#二进制传输" class="headerlink" title="二进制传输"></a>二进制传输</h3><p>HTTP2采用二进制传输数据，HTTP1.1采用纯文本方式传输，二进制协议解析会更为高效。<strong>HTTP&#x2F;2 将请求和响应数据分割为更小的帧，并且它们采用二进制编码</strong></p>
+<p>HTTP2采用数据帧传输的方式有点像TCP协议一样采用报文分片+序号来解决数据分割之后乱序传输问题。HTTP1.1的数据会被划分为<code>HEADER帧</code>和<code>DATA帧</code>。采用数据分帧+序号的方式传输之后可以解决HTTP1.1每个连接双向传输问题，可以解决单连接上数据队头阻塞问题</p>
+<p><img src="/images/http2_frame_overview.svg" alt="http2_frame_overview"></p>
+<h4 id="数据流-x2F-消息-x2F-帧"><a href="#数据流-x2F-消息-x2F-帧" class="headerlink" title="数据流&#x2F;消息&#x2F;帧"></a>数据流&#x2F;消息&#x2F;帧</h4><ul>
+<li><em>数据流</em>：已建立的连接内的双向字节流，可以承载一条或多条消息。</li>
+<li><em>消息</em>：与逻辑请求或响应消息对应的完整的一系列帧。</li>
+<li><em>帧</em>：HTTP&#x2F;2 通信的最小单位，每个帧都包含帧头，至少也会标识出当前帧所属的数据流。</li>
+</ul>
+<ol>
+<li>所有通信都在一个 TCP 连接上完成，此连接可以承载任意数量的双向数据流。</li>
+<li>每个数据流都有一个唯一的标识符和可选的优先级信息，用于承载双向消息</li>
+<li>每条消息都是一条逻辑 HTTP 消息（例如请求或响应），包含一个或多个帧。</li>
+<li>帧是最小的通信单位，承载着特定类型的数据，例如 HTTP 标头、消息负载等等。 来自不同数据流的帧可以交错发送，然后再根据每个帧头的数据流标识符重新组装。</li>
+</ol>
+<p>连接&#x2F;数据流&#x2F;帧之间的关系图如下所示，HTTP&#x2F;2 将 HTTP 协议通信分解为二进制编码帧的交换，这些帧对应着特定数据流中的消息。所有这些都在一个 TCP 连接内复用。 这是 HTTP&#x2F;2 协议所有其他功能和性能优化的基础。</p>
+<p><img src="/images/http2_stream_frame.svg" alt="http2_stream_frame"></p>
+<h4 id="请求响应复用"><a href="#请求响应复用" class="headerlink" title="请求响应复用"></a>请求响应复用</h4><p>在 HTTP&#x2F;1.x 中，如果客户端要想发起多个并行请求以提升性能，则必须使用多个 TCP 连接（请参阅<a target="_blank" rel="noopener" href="https://hpbn.co/http1x/#using-multiple-tcp-connections">使用多个 TCP 连接</a>）。 这是 HTTP&#x2F;1.x 交付模型的直接结果，该模型可以保证每个连接每次只交付一个响应（响应排队）。 更糟糕的是，这种模型也会导致队首阻塞，从而造成底层 TCP 连接的效率低下。</p>
+<p>HTTP&#x2F;2 中新的二进制分帧层突破了这些限制，实现了完整的请求和响应复用：客户端和服务器可以将 HTTP 消息分解为互不依赖的帧，然后交错发送，最后再在另一端把它们重新组装起来。</p>
+<p><img src="/../images/http2_request_response_overview.png" alt="http2_request_response_overview"></p>
+<ul>
+<li>并行交错地发送多个请求，请求之间互不影响。</li>
+<li>并行交错地发送多个响应，响应之间互不干扰。</li>
+<li>使用一个连接并行发送多个请求和响应。不必再为绕过 HTTP&#x2F;1.x 限制而做很多工作（请参阅<a target="_blank" rel="noopener" href="https://hpbn.co/optimizing-application-delivery/#optimizing-for-http1x">针对 HTTP&#x2F;1.x 进行优化</a>，例如级联文件、image sprites 和域名分片。</li>
+</ul>
+<h3 id="Header压缩"><a href="#Header压缩" class="headerlink" title="Header压缩"></a>Header压缩</h3><p>HTTP&#x2F;2 并没有使用传统的压缩算法，而是开发了专门的 “HPACK”算法，在客户端和服务器两端建立“字典”，用索引号表示重复的字符串，还采用哈夫曼编码来压缩整数和字符串，可以达到 50%~90% 的高压缩率。</p>
+<ol>
+<li><p>这种格式支持通过静态霍夫曼代码对传输的标头字段进行编码，从而减小了各个传输的大小。</p>
+</li>
+<li><p>这种格式要求客户端和服务器同时维护和更新一个包含之前见过的标头字段的索引列表（换句话说，它可以建立一个共享的压缩上下文），此列表随后会用作参考，对之前传输的值进行有效编码。</p>
+</li>
+<li><p>HTTP&#x2F;2 在客户端和服务器端使用“首部表”来跟踪和存储之前发送的键－值对，对于相同的数据，不再通过每次请求和响应发送；首部表在 HTTP&#x2F;2 的连接存续期内始终存在，由客户端和服务器共同渐进地更新；每个新的首部键－值对要么被追加到当前表的末尾，要么替换表中之前的值；</p>
+<p>利用霍夫曼编码，可以在传输时对各个值进行压缩，而利用之前传输值的索引列表，我们可以通过传输索引值的方式对重复值进行编码，索引值可用于有效查询和重构完整的标头键值对。</p>
+<p><img src="/images/http2_stream_header.svg" alt="http2_stream_header"></p>
+</li>
+</ol>
+<h3 id="HTTP2-缺陷"><a href="#HTTP2-缺陷" class="headerlink" title="HTTP2 缺陷"></a>HTTP2 缺陷</h3><p>HTTP2协议解决了很多 HTTP1.1协议的设计问题，但是HTTP2协议依然存在一个根本问题，就是HTTP2协议传输层采用TCP协议，TCP协议传输机制可能会让HTTP2性能不如HTTP1.1。</p>
+<p>HTTP2主要的缺点：</p>
+<ol>
+<li>TCP和TLS建连时延</li>
+</ol>
+<p>在建立 TCP 连接的时候，需要和服务器进行三次握手来确认连接成功，也就是说需要在消耗完 1.5 个 RTT 之后才能进行数据传输；</p>
+<p>进行 TLS 连接，TLS 有两个版本——TLS1.2 和 TLS1.3，每个版本建立连接所花的时间不同，大致是需要 1~2 个 RTT；	</p>
+<p>在传输数据之前，我们需要花掉 3～4 个 RTT</p>
+<ol start="2">
+<li>TCP队头阻塞问题</li>
+</ol>
+<p>在 HTTP&#x2F;2 中，多个请求是跑在一个 TCP 管道中的。但当出现了丢包时，HTTP&#x2F;2 的表现反倒不如 HTTP&#x2F;1 了。因为 TCP 为了保证可靠传输，有个特别的“丢包重传”机制，丢失的包必须要等待重新传输确认，HTTP&#x2F;2 出现丢包时，整个 TCP 都要开始等待重传，那么就会阻塞该 TCP 连接中的所有请求。而对于 HTTP&#x2F;1.1 来说，可以开启多个 TCP 连接，出现这种情况反倒只会影响其中一个连接，剩余的 TCP 连接还可以正常传输数据。</p>
+<h2 id="HTTP3-协议"><a href="#HTTP3-协议" class="headerlink" title="HTTP3  协议"></a>HTTP3  协议</h2><p>为了解决HTTP2缺点，Goole搞了一个基于UDP的QUIC协议，QUIC协议目的是为了提供像TCP一样的数据传输可靠性同时提升网络传输性能。</p>
+<ul>
+<li>实现了类似 TCP 的流量控制、传输可靠性的功能。虽然 UDP 不提供可靠性的传输，但 QUIC 在 UDP 的基础之上增加了一层来保证数据可靠性传输。它提供了数据包重传、拥塞控制以及其他一些 TCP 中存在的特性。</li>
+<li>实现了快速握手功能。由于 QUIC 是基于 UDP 的，所以 QUIC 可以实现使用 0-RTT 或者 1-RTT 来建立连接，这意味着 QUIC 可以用最快的速度来发送和接收数据，这样可以大大提升首次打开页面的速度。0RTT 建连可以说是 QUIC 相比 HTTP2 最大的性能优势。</li>
+<li>多路复用，彻底解决 TCP 中队头阻塞的问题</li>
+</ul>
+<p>参考:</p>
+<p><a target="_blank" rel="noopener" href="https://www.infoq.cn/article/kU4OkqR8vH123a8dLCCJ">解密 HTTP&#x2F;2 与 HTTP&#x2F;3 的新特性</a></p>
+<p><a target="_blank" rel="noopener" href="https://developers.google.com/web/fundamentals/performance/http2?hl=zh-CN">HTTP&#x2F;2 简介</a></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/web/" rel="tag"># web</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2019/11/28/Golang%20Code%20Review%20%E8%A7%84%E8%8C%83/" rel="prev" title="Uber  Golang 编程规范">
+      <i class="fa fa-chevron-left"></i> Uber  Golang 编程规范
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/01/05/Quic%20%E5%8D%8F%E8%AE%AE/" rel="next" title="Quic协议-概览">
+      Quic协议-概览 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#HTTP2%E5%8D%8F%E8%AE%AE-%E6%A6%82%E8%A7%88"><span class="nav-number">1.</span> <span class="nav-text">HTTP2协议-概览</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#HTTP1-1-%E5%8D%8F%E8%AE%AE%E7%BC%BA%E9%99%B7"><span class="nav-number">1.1.</span> <span class="nav-text">HTTP1.1 协议缺陷</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SPDY%E5%8D%8F%E8%AE%AE"><span class="nav-number">1.2.</span> <span class="nav-text">SPDY协议</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#HTTP2-%E5%8D%8F%E8%AE%AE"><span class="nav-number">1.3.</span> <span class="nav-text">HTTP2 协议</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#HTTP2-%E7%89%B9%E6%80%A7"><span class="nav-number">1.4.</span> <span class="nav-text">HTTP2 特性</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8C%E8%BF%9B%E5%88%B6%E4%BC%A0%E8%BE%93"><span class="nav-number">1.4.1.</span> <span class="nav-text">二进制传输</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E6%B5%81-x2F-%E6%B6%88%E6%81%AF-x2F-%E5%B8%A7"><span class="nav-number">1.4.1.1.</span> <span class="nav-text">数据流&#x2F;消息&#x2F;帧</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%AF%B7%E6%B1%82%E5%93%8D%E5%BA%94%E5%A4%8D%E7%94%A8"><span class="nav-number">1.4.1.2.</span> <span class="nav-text">请求响应复用</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Header%E5%8E%8B%E7%BC%A9"><span class="nav-number">1.4.2.</span> <span class="nav-text">Header压缩</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#HTTP2-%E7%BC%BA%E9%99%B7"><span class="nav-number">1.4.3.</span> <span class="nav-text">HTTP2 缺陷</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#HTTP3-%E5%8D%8F%E8%AE%AE"><span class="nav-number">1.5.</span> <span class="nav-text">HTTP3  协议</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Yujie</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">45</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Yujie</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="Go Clean Architecture 实现之前阅读了《Clean Architecture》，结合一些个人理解，用Golang实现一个实现整洁架构的业务开发框架，我们回顾下整洁架构的主要要素：  框架独立性，不依赖于特定的软件库框架，这样你可以像工具一样使用这种框架，而不需要让你的系统受到它的约束条件； 可测试性，可以在没有 UI、数据库、Web 服务器或任何其他外部依赖的情况下可以测试业务">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Go Clean Architecture 实现">
+<meta property="og:url" content="http://yoursite.com/2020/03/25/Go%20Clean%20Architecture%20%E5%AE%9E%E7%8E%B0/index.html">
+<meta property="og:site_name" content="KnifeFly">
+<meta property="og:description" content="Go Clean Architecture 实现之前阅读了《Clean Architecture》，结合一些个人理解，用Golang实现一个实现整洁架构的业务开发框架，我们回顾下整洁架构的主要要素：  框架独立性，不依赖于特定的软件库框架，这样你可以像工具一样使用这种框架，而不需要让你的系统受到它的约束条件； 可测试性，可以在没有 UI、数据库、Web 服务器或任何其他外部依赖的情况下可以测试业务">
+<meta property="og:locale">
+<meta property="og:image" content="https://github.com/bxcodec/go-clean-arch/raw/master/clean-arch.png">
+<meta property="article:published_time" content="2020-03-25T02:41:13.000Z">
+<meta property="article:modified_time" content="2023-03-12T09:37:48.798Z">
+<meta property="article:author" content="Yujie">
+<meta property="article:tag" content="架构设计">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/bxcodec/go-clean-arch/raw/master/clean-arch.png">
+
+<link rel="canonical" href="http://yoursite.com/2020/03/25/Go%20Clean%20Architecture%20%E5%AE%9E%E7%8E%B0/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>Go Clean Architecture 实现 | KnifeFly</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">KnifeFly</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/03/25/Go%20Clean%20Architecture%20%E5%AE%9E%E7%8E%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Go Clean Architecture 实现
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2020-03-25 10:41:13" itemprop="dateCreated datePublished" datetime="2020-03-25T10:41:13+08:00">2020-03-25</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-03-12 17:37:48" itemprop="dateModified" datetime="2023-03-12T17:37:48+08:00">2023-03-12</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="Go-Clean-Architecture-实现"><a href="#Go-Clean-Architecture-实现" class="headerlink" title="Go Clean Architecture 实现"></a>Go Clean Architecture 实现</h1><p>之前阅读了<a target="_blank" rel="noopener" href="https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html">《Clean Architecture》</a>，结合一些个人理解，用Golang实现一个实现整洁架构的业务开发框架，我们回顾下整洁架构的主要要素：</p>
+<ul>
+<li>框架独立性，不依赖于特定的软件库框架，这样你可以像工具一样使用这种框架，而不需要让你的系统受到它的约束条件；</li>
+<li>可测试性，可以在没有 UI、数据库、Web 服务器或任何其他外部依赖的情况下可以测试业务规则；</li>
+<li>UI独立性，UI 可以轻松更改，而无需更改系统的其余部分；</li>
+<li>数据库独立性，可以将 Oracle 或 SQL Server 换成 Mongo、BigTable、CouchDB 或其他东西；</li>
+<li>外部依赖独立性，事实上业务逻辑代码不应该和外部具体实现打交道；</li>
+</ul>
+<p>Bob大叔的整洁架构主要包含四层：</p>
+<ul>
+<li>Entity</li>
+<li>Usecase</li>
+<li>Controller</li>
+<li>Framework &amp; Driver</li>
+</ul>
+<p><a target="_blank" rel="noopener" href="https://github.com/bxcodec/go-clean-arch/raw/master/clean-arch.png"><img src="https://github.com/bxcodec/go-clean-arch/raw/master/clean-arch.png" alt="golang clean architecture"></a></p>
+<p>我们结合golang项目推荐做法和Bob大叔的整洁架构思想来做项目划分</p>
+<h2 id="Golang-standard-project-layout"><a href="#Golang-standard-project-layout" class="headerlink" title="Golang standard project layout"></a>Golang standard project layout</h2><p>对于golang项目组织架构可以参考<a target="_blank" rel="noopener" href="https://github.com/golang-standards/project-layout/blob/master/README_zh.md">golang-standards&#x2F;project-layout</a> 虽然这些不是强制性的，但是如果有去看一些开源项目基本也是这样组织的，我们可以作为参考</p>
+<h3 id="x2F-cmd目录"><a href="#x2F-cmd目录" class="headerlink" title="&#x2F;cmd目录"></a>&#x2F;cmd目录</h3><p>本项目的主干，每个应用程序的目录名应该与你想要的可执行文件的名称相匹配(例如，<code>/cmd/myapp</code>)</p>
+<p>不要在这个目录中放置太多代码。如果你认为代码可以导入并在其他项目中使用，那么它应该位于 <code>/pkg</code> 目录中。如果代码不是可重用的，或者你不希望其他人重用它，请将该代码放到 <code>/internal</code> 目录中。你会惊讶于别人会怎么做，所以要明确你的意图!</p>
+<p>通常有一个小的 <code>main</code> 函数，从 <code>/internal</code> 和 <code>/pkg</code> 目录导入和调用代码，除此之外没有别的东西。</p>
+<h3 id="x2F-internal"><a href="#x2F-internal" class="headerlink" title="&#x2F;internal"></a>&#x2F;internal</h3><p>私有应用程序和库代码。这是你不希望其他人在其应用程序或库中导入代码。请注意，这个布局模式是由 Go 编译器本身执行的。有关更多细节，请参阅Go 1.4 <a target="_blank" rel="noopener" href="https://golang.org/doc/go1.4#internalpackages"><code>release notes</code></a> 。注意，你并不局限于顶级 <code>internal</code> 目录。在项目树的任何级别上都可以有多个内部目录。</p>
+<p>你可以选择向 internal 包中添加一些额外的结构，以分隔共享和非共享的内部代码。这不是必需的(特别是对于较小的项目)，但是最好有有可视化的线索来显示预期的包的用途。你的实际应用程序代码可以放在 <code>/internal/app</code> 目录下(例如 <code>/internal/app/myapp</code>)，这些应用程序共享的代码可以放在 <code>/internal/pkg</code> 目录下(例如 <code>/internal/pkg/myprivlib</code>)。</p>
+<h3 id="x2F-pkg"><a href="#x2F-pkg" class="headerlink" title="&#x2F;pkg"></a>&#x2F;pkg</h3><p>外部应用程序可以使用的库代码(例如 <code>/pkg/mypubliclib</code>)。其他项目会导入这些库，希望它们能正常工作，所以在这里放东西之前要三思:-)注意，<code>internal</code> 目录是确保私有包不可导入的更好方法，因为它是由 Go 强制执行的。<code>/pkg</code> 目录仍然是一种很好的方式，可以显式地表示该目录中的代码对于其他人来说是安全使用的好方法。由 Travis Jeffery 撰写的 <a target="_blank" rel="noopener" href="https://travisjeffery.com/b/2019/11/i-ll-take-pkg-over-internal/"><code>I&#39;ll take pkg over internal</code></a> 博客文章提供了 <code>pkg</code> 和 <code>internal</code> 目录的一个很好的概述，以及什么时候使用它们是有意义的。</p>
+<p>如果你的应用程序项目真的很小，并且额外的嵌套并不能增加多少价值(除非你真的想要:-)，那就不要使用它。当它变得足够大时，你的根目录会变得非常繁琐时(尤其是当你有很多非 Go 应用组件时)，请考虑一下。</p>
+<h3 id="x2F-api"><a href="#x2F-api" class="headerlink" title="&#x2F;api"></a>&#x2F;api</h3><p>OpenAPI&#x2F;Swagger 规范，JSON 模式文件，协议定义文件，参考：</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://github.com/kubernetes/kubernetes/tree/master/api">https://github.com/kubernetes/kubernetes/tree/master/api</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/moby/moby/tree/master/api">https://github.com/moby/moby/tree/master/api</a></li>
+</ul>
+<p>api目录可以按照产品线、业务模块、版本号进行划分</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">.</span><br><span class="line">└── api</span><br><span class="line">    └── product_name // product name</span><br><span class="line">        └── app_name // application name</span><br><span class="line">            └── v1   // version</span><br><span class="line">                └── v1.proto</span><br></pre></td></tr></table></figure>
+
+<h3 id="x2F-configs"><a href="#x2F-configs" class="headerlink" title="&#x2F;configs"></a>&#x2F;configs</h3><p>配置文件模板或默认配置，例如json或者yaml格式的配置文件</p>
+<h3 id="x2F-scripts"><a href="#x2F-scripts" class="headerlink" title="&#x2F;scripts"></a>&#x2F;scripts</h3><p>执行各种构建、安装、分析等操作的脚本，参考：</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://github.com/kubernetes/helm/tree/master/scripts">https://github.com/kubernetes/helm/tree/master/scripts</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/cockroachdb/cockroach/tree/master/scripts">https://github.com/cockroachdb/cockroach/tree/master/scripts</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/hashicorp/terraform/tree/master/scripts">https://github.com/hashicorp/terraform/tree/master/scripts</a></li>
+</ul>
+<h3 id="x2F-deploy"><a href="#x2F-deploy" class="headerlink" title="&#x2F;deploy"></a>&#x2F;deploy</h3><p>IaaS、PaaS、系统和容器编排部署配置和模板</p>
+<h3 id="x2F-test"><a href="#x2F-test" class="headerlink" title="&#x2F;test"></a>&#x2F;test</h3><p>额外的外部测试应用程序和测试数据。你可以随时根据需求构造 <code>/test</code> 目录。对于较大的项目，有一个数据子目录是有意义的。例如，你可以使用 <code>/test/data</code> 或 <code>/test/testdata</code> (如果你需要忽略目录中的内容)。请注意，Go 还会忽略以“.”或“_”开头的目录或文件，因此在如何命名测试数据目录方面有更大的灵活性。</p>
+<h3 id="x2F-docs"><a href="#x2F-docs" class="headerlink" title="&#x2F;docs"></a>&#x2F;docs</h3><p>设计和用户文档(除了 godoc 生成的文档之外)。</p>
+<p>其他总结：</p>
+<blockquote>
+<ol>
+<li>一般而言，在 Go 项目当中不应该出现 src 目录，Go 和 Java 不同，在 Go 中每一个目录都是一个包，每一个包都是一等公民，当然也有一些开源项目会出现src目录，不过相对比较少</li>
+<li>此外最好不要在项目中出现 utils 和 common 这种包，长久之后这个包里面都有，因为大家会把不知道丢哪个目录的文件都会丢在这个目录下</li>
+<li>通常来说一个大team或者整个公司，应该有一个golang kit开发库，这个库有专门的开发维护，提供一些通用的功能，例如logging&#x2F;metric&#x2F;tracing，database&#x2F;cache封装方法，config管理方法，以及一些常用的lib。对于这个kit仓库，需要有良好的抽象，支持插件，减少依赖，避免每个小组各自维护一套自己的kit库</li>
+</ol>
+</blockquote>
+<h2 id="Golang-clean-architecture"><a href="#Golang-clean-architecture" class="headerlink" title="Golang clean architecture"></a>Golang clean architecture</h2><p>对于每个项目其实都会按照模块不同划分不同的服务模块：</p>
+<ul>
+<li>admin服务，通常来说是面向运营人员的系统，具有很高的数据权限；</li>
+<li>interface服务，或者是portal服务，通常来说是面向BFF层的服务，接受来自用户的请求，比如暴露了 HTTP&#x2F;gRPC 接口；</li>
+<li>inner service服务，对内的微服务，仅接受来自内部其他服务或者网关的请求，比如暴露了 gRPC 接口只对内服务；</li>
+<li>job服务，流式任务处理的服务，上游一般依赖 message broker；</li>
+<li>task定时任务，类似 cronjob，定时执行一些任务；</li>
+</ul>
+<p>对于这种项目，我们可以新增app目录，然后把每个子项目丢在这个目录下，每个子项目的结构按照上面的项目布局，最终整个项目的结构大概是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">.</span><br><span class="line">├── Makefile</span><br><span class="line">├── README.md</span><br><span class="line">├── api</span><br><span class="line">│   ├── admin</span><br><span class="line">│   ├── portal</span><br><span class="line">│   └── service</span><br><span class="line">├── app</span><br><span class="line">│   ├── admin</span><br><span class="line">│   ├── inner</span><br><span class="line">│   ├── job</span><br><span class="line">│   ├── portal</span><br><span class="line">│   └── task</span><br><span class="line">├── deploy</span><br><span class="line">├── docs</span><br><span class="line">├── go.mod</span><br><span class="line">├── pkg</span><br><span class="line">├── scripts</span><br><span class="line">└── third_party</span><br></pre></td></tr></table></figure>
+
+<p>每个子项目的架构大概是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">.</span><br><span class="line">├── Makefile</span><br><span class="line">├── README.md</span><br><span class="line">├── cmd</span><br><span class="line">│   └── main.go</span><br><span class="line">├── configs</span><br><span class="line">│   └── config.yaml</span><br><span class="line">└── internal</span><br><span class="line">    ├── biz</span><br><span class="line">    │   ├── billing</span><br><span class="line">    │   ├── campaign</span><br><span class="line">    │   ├── contract</span><br><span class="line">    │   └── order</span><br><span class="line">    ├── conf</span><br><span class="line">    │   └── conf.go</span><br><span class="line">    ├── repo</span><br><span class="line">    │   ├── billing</span><br><span class="line">    │   ├── campaign</span><br><span class="line">    │   ├── contract</span><br><span class="line">    │   └── order</span><br><span class="line">    ├── server</span><br><span class="line">    │   ├── grpc.go</span><br><span class="line">    │   └── http.go</span><br><span class="line">    └── service</span><br><span class="line">        ├── billing</span><br><span class="line">        ├── campaign</span><br><span class="line">        ├── contract</span><br><span class="line">        └── order</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>biz 业务逻辑的组装层，类似 DDD 的 domain 层，包含entity实体定义、usecase业务逻辑，repo 接口在这里定义，使用依赖倒置的原则；</li>
+<li>repo 包含PO持久对象定义。包含PO持久对象定义，包含 cache、db 等封装，同时实现了 biz 的 repo 接口；</li>
+<li>service 实现了 api 定义的服务层，类似 DDD 的 application 层，处理 DTO 到 biz 领域实体的转换(DTO -&gt; DO)，同时协同各类 biz 交互，但是不应处理复杂逻辑；</li>
+<li>server rpc服务和http服务启动管理，这个目录内容很少主要是生命周期管理；</li>
+</ul>
+<p>参考资料：</p>
+<p>1.<a target="_blank" rel="noopener" href="https://medium.easyread.co/golang-clean-archithecture-efd6d7c43047">https://medium.easyread.co/golang-clean-archithecture-efd6d7c43047</a></p>
+<p>2.<a target="_blank" rel="noopener" href="https://medium.easyread.co/trying-clean-architecture-on-golang-2-44d615bf8fdf">https://medium.easyread.co/trying-clean-architecture-on-golang-2-44d615bf8fdf</a></p>
+<p>3.<a target="_blank" rel="noopener" href="https://github.com/bxcodec/go-clean-arch">https://github.com/bxcodec/go-clean-arch</a></p>
+<p>4.<a target="_blank" rel="noopener" href="https://github.com/golang-standards/project-layout/blob/master/README_zh.md">https://github.com/golang-standards/project-layout/blob/master/README_zh.md</a></p>
+<p>5.<a target="_blank" rel="noopener" href="https://go-kratos.dev/">https://go-kratos.dev/</a></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/" rel="tag"># 架构设计</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/03/05/Clean%20Architecture/" rel="prev" title="Clean Architecture">
+      <i class="fa fa-chevron-left"></i> Clean Architecture
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Go-Clean-Architecture-%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.</span> <span class="nav-text">Go Clean Architecture 实现</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#Golang-standard-project-layout"><span class="nav-number">1.1.</span> <span class="nav-text">Golang standard project layout</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#x2F-cmd%E7%9B%AE%E5%BD%95"><span class="nav-number">1.1.1.</span> <span class="nav-text">&#x2F;cmd目录</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#x2F-internal"><span class="nav-number">1.1.2.</span> <span class="nav-text">&#x2F;internal</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#x2F-pkg"><span class="nav-number">1.1.3.</span> <span class="nav-text">&#x2F;pkg</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#x2F-api"><span class="nav-number">1.1.4.</span> <span class="nav-text">&#x2F;api</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#x2F-configs"><span class="nav-number">1.1.5.</span> <span class="nav-text">&#x2F;configs</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#x2F-scripts"><span class="nav-number">1.1.6.</span> <span class="nav-text">&#x2F;scripts</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#x2F-deploy"><span class="nav-number">1.1.7.</span> <span class="nav-text">&#x2F;deploy</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#x2F-test"><span class="nav-number">1.1.8.</span> <span class="nav-text">&#x2F;test</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#x2F-docs"><span class="nav-number">1.1.9.</span> <span class="nav-text">&#x2F;docs</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Golang-clean-architecture"><span class="nav-number">1.2.</span> <span class="nav-text">Golang clean architecture</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Yujie</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">45</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Yujie</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

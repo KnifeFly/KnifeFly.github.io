@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"yoursite.com","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="QUIC 协议简介QUIC英文全称为Quick UDP Internet Connections，意思是快速UDP网络连接，是一种位于传输层的网络传输协议，最早由Google开发，旨在使用UDP来替换TCP协议，解决TCP传输建连和传输延迟并且提供类似SSL&#x2F;TLS网络安全功能，希望使用该协议使得网络传输更快。  2018 年 10 月，互联网工程任务组 HTTP 及 QUIC 工作小组">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Quic协议-概览">
+<meta property="og:url" content="http://yoursite.com/2020/01/05/Quic%20%E5%8D%8F%E8%AE%AE/index.html">
+<meta property="og:site_name" content="KnifeFly">
+<meta property="og:description" content="QUIC 协议简介QUIC英文全称为Quick UDP Internet Connections，意思是快速UDP网络连接，是一种位于传输层的网络传输协议，最早由Google开发，旨在使用UDP来替换TCP协议，解决TCP传输建连和传输延迟并且提供类似SSL&#x2F;TLS网络安全功能，希望使用该协议使得网络传输更快。  2018 年 10 月，互联网工程任务组 HTTP 及 QUIC 工作小组">
+<meta property="og:locale">
+<meta property="article:published_time" content="2020-01-05T03:05:29.000Z">
+<meta property="article:modified_time" content="2023-03-12T09:01:58.614Z">
+<meta property="article:author" content="Yujie">
+<meta property="article:tag" content="web">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://yoursite.com/2020/01/05/Quic%20%E5%8D%8F%E8%AE%AE/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-Hans'
+  };
+</script>
+
+  <title>Quic协议-概览 | KnifeFly</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">KnifeFly</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-Hans">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/01/05/Quic%20%E5%8D%8F%E8%AE%AE/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Yujie">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="KnifeFly">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Quic协议-概览
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+
+              <time title="Created: 2020-01-05 11:05:29" itemprop="dateCreated datePublished" datetime="2020-01-05T11:05:29+08:00">2020-01-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">Edited on</span>
+                <time title="Modified: 2023-03-12 17:01:58" itemprop="dateModified" datetime="2023-03-12T17:01:58+08:00">2023-03-12</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="QUIC-协议简介"><a href="#QUIC-协议简介" class="headerlink" title="QUIC 协议简介"></a>QUIC 协议简介</h2><p>QUIC英文全称为<code>Quick UDP Internet Connections</code>，意思是快速UDP网络连接，是一种位于传输层的网络传输协议，最早由<code>Google</code>开发，旨在使用UDP来替换TCP协议，解决TCP传输建连和传输延迟并且提供类似SSL&#x2F;TLS网络安全功能，希望使用该协议使得网络传输更快。</p>
+<blockquote>
+<p>2018 年 10 月，互联网工程任务组 HTTP 及 QUIC 工作小组正式将基于 QUIC 协议的 HTTP (英语：HTTP over QUIC) 重命名为 <a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/HTTP/3">HTTP&#x2F;3</a> 以为确立下一代规范做准备。</p>
+</blockquote>
+<p>QUIC协议主要特点</p>
+<ul>
+<li>减小连接创建时的开销，QUIC使协商<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/%E5%82%B3%E8%BC%B8%E5%B1%A4%E5%AE%89%E5%85%A8%E6%80%A7%E5%8D%94%E5%AE%9A#%E5%AF%86%E9%92%A5%E4%BA%A4%E6%8D%A2%E5%92%8C%E5%AF%86%E9%92%A5%E5%8D%8F%E5%95%86">密钥</a>和支持的协议成为初始<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/%E6%8F%A1%E6%89%8B_(%E6%8A%80%E6%9C%AF)">握手</a>过程的一部分，当客户端打开连接时，<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/%E6%9C%8D%E5%8A%A1%E5%99%A8">服务器</a>响应的<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/%E6%95%B0%E6%8D%AE%E5%8C%85">数据包</a>包括将来的数据包<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/%E5%8A%A0%E5%AF%86">加密</a>所需的数据</li>
+<li>QUIC的另一个目标是提高网络切换期间的性能，例如当移动设备的用户从<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/Wi-Fi">WiFi热点</a>切换到<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/%E7%A7%BB%E5%8A%A8%E7%BD%91%E7%BB%9C">移动网络</a>时发生的情况。</li>
+<li>QUIC在<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/w/index.php?title=%E5%BA%94%E7%94%A8%E7%A8%8B%E5%BA%8F%E7%A9%BA%E9%97%B4&action=edit&redlink=1">应用程序空间</a>中实现，而不是在<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/%E5%86%85%E6%A0%B8">操作系统内核</a>中实现。QUIC允许更容易地进行未来更改，因为它不需要更改内核就可以进行更新</li>
+<li>改进的拥塞控制</li>
+<li>避免队头阻塞的多路复用</li>
+<li>前向冗余纠错</li>
+</ul>
+<h2 id="协议提出历史背景"><a href="#协议提出历史背景" class="headerlink" title="协议提出历史背景"></a>协议提出历史背景</h2><ol>
+<li>多个协议栈在内核中实现，升级困难问题</li>
+</ol>
+<p>当前互联网中最常用的应用层协议HTTP，传输层协议采用TCP，安全套接字采用SSL&#x2F;TLS，域名解析解析采用DNS，网络层协议采用IPV4协议。这几种协议历史悠久，更新缓慢，由于很多协议栈的实现在内核中实现，互联网中间设备众多，协议更新难度大。国家层面也在推进IPV6基础建设，但是由于难度大至今仍未普及。</p>
+<ol start="2">
+<li>建立连接握手延迟问题</li>
+</ol>
+<p>当前互联网中使用最多的HTTP协议，HTTP&#x2F;1.1、HTTPS、HTTP2，都使用了TCP传输层协议，HTTPS和HTTP2才使用到了SSL&#x2F;TLS，这就出现了多个建连延迟。一个TCP三次握手延迟，另一个是TLS建连至少需要2个RTT。</p>
+<ol start="3">
+<li>TCP队头阻塞问题</li>
+</ol>
+<p>TCP使用了序号来标识报文，数据处理必须按照顺序处理，如果前面的数据丢失，后面的数据到了也不会通知应用层处理。所以 QUIC 协议选择了 UDP，因为 UDP 本身没有连接的概念，不需要三次握手，优化了连接建立的握手延迟，同时在应用程序层面实现了 TCP 的可靠性，TLS 的安全性和 HTTP2 的并发性，只需要用户端和服务端的应用程序支持 QUIC 协议，完全避开了操作系统和中间设备的限制。(引用自<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/32553477">科普：QUIC协议原理分析</a>)</p>
+<ol start="4">
+<li>TCP拥塞控制算法问题</li>
+</ol>
+<p>传统的TCP拥塞控制算法，基本分为<code>慢启动，拥塞避免，快速重传，快速恢复</code>，后续改进的拥塞控制算法诸如<code>CUBIC</code>,<code>BBR</code>，<code>Reno</code>等，这些拥塞控制算法实现不太一样，但是可以确定的是这些算法都需要内核支持。</p>
+<h2 id="Quic协议优势"><a href="#Quic协议优势" class="headerlink" title="Quic协议优势"></a>Quic协议优势</h2><ol>
+<li>不是在内核中实现</li>
+</ol>
+<p>QUIC在<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/w/index.php?title=%E5%BA%94%E7%94%A8%E7%A8%8B%E5%BA%8F%E7%A9%BA%E9%97%B4&action=edit&redlink=1">应用程序空间</a>中实现，而不是在<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/wiki/%E5%86%85%E6%A0%B8">操作系统内核</a>中实现。QUIC允许更容易地进行未来更改，因为它不需要更改内核就可以进行更新</p>
+<ol start="2">
+<li>建连握手延迟低</li>
+</ol>
+<p>Quic协议可在1RTT或者0RTT就可以完成服务器端和移动端的建连</p>
+<ol start="3">
+<li><p>避免队投阻塞</p>
+</li>
+<li><p>改进的拥塞控制</p>
+</li>
+</ol>
+<p>QUIC协议也实现了<code>BBR/CUBIC</code>等控制算法，不过是在应用层实现的这些控制算法，并非在操作系统的内核层面。最为牛逼的还是QUIC协议可以同时使用多个拥塞控制算法，甚至可以为每个接入用户单独设置拥塞控制算法，如果再加上人工智能算法，根据终端用户接入的网络环境，自动设置不同的控制算法，这还是非常牛逼</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/web/" rel="tag"># web</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2019/12/04/HTTP2%20%E5%8D%8F%E8%AE%AE%E6%A6%82%E8%A7%88/" rel="prev" title="HTTP2协议-概览">
+      <i class="fa fa-chevron-left"></i> HTTP2协议-概览
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/03/02/Go%20%E4%BE%9D%E8%B5%96%E6%B3%A8%E5%85%A5/" rel="next" title="Go Clean Architecture 实现">
+      Go Clean Architecture 实现 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#QUIC-%E5%8D%8F%E8%AE%AE%E7%AE%80%E4%BB%8B"><span class="nav-number">1.</span> <span class="nav-text">QUIC 协议简介</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%8F%E8%AE%AE%E6%8F%90%E5%87%BA%E5%8E%86%E5%8F%B2%E8%83%8C%E6%99%AF"><span class="nav-number">2.</span> <span class="nav-text">协议提出历史背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Quic%E5%8D%8F%E8%AE%AE%E4%BC%98%E5%8A%BF"><span class="nav-number">3.</span> <span class="nav-text">Quic协议优势</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Yujie</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">45</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Yujie</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
